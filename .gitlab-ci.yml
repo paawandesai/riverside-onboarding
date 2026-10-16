@@ -76,6 +76,17 @@ licenses:
     # Regenerate and fail if a shipped package has a disallowed license or LICENSES.md is stale.
     - backend/.venv/bin/python scripts/license_audit.py --check
 
+terraform:
+  stage: test
+  image:
+    name: hashicorp/terraform:1.16.6
+    entrypoint: [""]
+  script:
+    - cd infra/terraform
+    - terraform fmt -check -recursive
+    - terraform init -backend=false -input=false
+    - terraform validate
+
 ocr-eval:
   stage: test
   image: python:3.13-slim-bookworm
