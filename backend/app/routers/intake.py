@@ -3,6 +3,7 @@ import re
 from datetime import UTC, date, datetime
 
 from fastapi import APIRouter, Depends, File, HTTPException, Request, UploadFile
+from fastapi.concurrency import run_in_threadpool
 from pydantic import BaseModel, Field, field_validator
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -61,7 +62,8 @@ async def extract_document(
     max_bytes = get_settings().max_upload_mb * 1024 * 1024
     data = await file.read(max_bytes + 1)
     try:
-        clean = validate_and_clean(data, max_bytes)
+        # CPU-bound work runs off the event loop so one upload can't stall other requests.
+        clean = await run_in_threadpool(validate_and_clean, data, max_bytes)
     except UploadRejected as exc:
         log_event(logger, "upload_rejected", component="ocr", outcome="rejected", user_id=user.id)
         raise HTTPException(status_code=422, detail=str(exc)) from None
@@ -69,7 +71,7 @@ async def extract_document(
         del data
 
     try:
-        result = ocr.extract_fields(clean.image)
+        result = await run_in_threadpool(ocr.extract_fields, clean.image)
         health_state.record_success("ocr")
     except ocr.OcrUnavailable:
         health_state.record_failure("ocr")
