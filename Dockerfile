@@ -1,8 +1,13 @@
+# syntax=docker/dockerfile:1
 # --- frontend build ---
+# Behind a TLS-intercepting proxy, pass its CA without baking it into the image:
+#   docker build --secret id=proxy_ca,src=/path/to/ca.crt .
 FROM node:22-bookworm-slim AS web
 WORKDIR /web
 COPY frontend/package.json frontend/package-lock.json ./
-RUN npm ci --no-audit --no-fund
+RUN --mount=type=secret,id=proxy_ca,required=false \
+    if [ -f /run/secrets/proxy_ca ]; then export NODE_EXTRA_CA_CERTS=/run/secrets/proxy_ca; fi; \
+    npm ci --no-audit --no-fund
 COPY frontend/ ./
 RUN npm run build
 
@@ -15,7 +20,9 @@ RUN apt-get update \
  && rm -rf /var/lib/apt/lists/*
 WORKDIR /app
 COPY backend/requirements.txt ./
-RUN pip install -r requirements.txt
+RUN --mount=type=secret,id=proxy_ca,required=false \
+    if [ -f /run/secrets/proxy_ca ]; then export PIP_CERT=/run/secrets/proxy_ca; fi; \
+    pip install -r requirements.txt
 COPY backend/ ./
 COPY --from=web /web/dist ./static
 RUN useradd --system --uid 10001 app && chown -R app /app
