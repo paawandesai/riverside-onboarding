@@ -114,6 +114,9 @@ never sent to a model. The Claude path for these cases has not been run yet.
 - The deployment uses a public Postgres endpoint restricted to Azure services (no VNet on the
   free account) and scales to zero, so the first request after idle is slow.
 - Age is self-attested; nothing verifies it.
+- The CI image-build job is manual: the GitLab runner is unprivileged and blocks user
+  namespaces, so Docker-in-Docker and Buildah both fail there. The image is built and
+  smoke-tested locally and by `infra/deploy.sh`.
 
 ## Data sent to each provider
 
