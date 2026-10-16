@@ -103,7 +103,7 @@ ocr-eval:
     when: always
     paths: [eval/results/latest.json]
 
-image:
+docker-image:
   stage: build
   image: docker:27.5.1
   services: ["docker:27.5.1-dind"]
