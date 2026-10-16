@@ -9,6 +9,7 @@ Each field reports found / missing / low_confidence. Nothing is guessed: a field
 cannot read is returned as None so the user fills it in.
 """
 
+import os
 import re
 import time
 from dataclasses import dataclass, field
@@ -19,6 +20,10 @@ import pytesseract
 from PIL import Image, ImageFilter, ImageOps
 
 from app.config import get_settings
+
+# One OpenMP thread per Tesseract process. Requests already run in parallel; letting each process
+# spawn a thread per core oversubscribes the CPU and made OCR time out on a busy CI runner.
+os.environ.setdefault("OMP_THREAD_LIMIT", "1")
 
 FIELDS = ("full_name", "dob", "address")
 LOW_CONFIDENCE = 60.0

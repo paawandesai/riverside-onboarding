@@ -38,10 +38,15 @@ backend:
   before_script:
     - apt-get update && apt-get install -y --no-install-recommends tesseract-ocr tesseract-ocr-eng && rm -rf /var/lib/apt/lists/*
     - cd backend && pip install -r requirements-dev.txt
+    # Throwaway per-job keys, generated here so none live in the repo or CI settings.
+    - export SESSION_SECRET="$(python -c 'import secrets;print(secrets.token_urlsafe(48))')"
+    - export FIELD_ENCRYPTION_KEY="$(python -c 'from cryptography.fernet import Fernet;print(Fernet.generate_key().decode())')"
   script:
-    - ruff check . && ruff format --check .
+    - ruff check .
+    - ruff format --check .
     # Migrations must build the same schema the models describe.
-    - alembic upgrade head && alembic check
+    - alembic upgrade head
+    - alembic check
     - pytest --cov-report=term --cov-report=xml:coverage.xml --junitxml=report.xml
   coverage: '/TOTAL.*\s(\d+(?:\.\d+)?)%/'
   artifacts:
