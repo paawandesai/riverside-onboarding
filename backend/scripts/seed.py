@@ -10,7 +10,7 @@ from sqlalchemy import func, select
 
 from app.db import get_db
 from app.models import Slot, User
-from app.security import email_lookup_key, encrypt_str, hash_password
+from app.security import email_lookup_key, encrypt_str, hash_password, verify_password
 from app.services.scheduling import seed_slots
 
 
@@ -27,7 +27,14 @@ def main() -> None:
         email, password = os.environ.get("DEMO_USER_EMAIL"), os.environ.get("DEMO_USER_PASSWORD")
         if not email or not password:
             raise SystemExit("Set DEMO_USER_EMAIL and DEMO_USER_PASSWORD to create the demo user.")
-        if db.scalar(select(User).where(User.email_lookup == email_lookup_key(email))) is None:
+        existing = db.scalar(select(User).where(User.email_lookup == email_lookup_key(email)))
+        if existing is not None:
+            # Rotating DEMO_USER_PASSWORD and redeploying rotates the demo credentials.
+            if not verify_password(existing.password_hash, password):
+                existing.password_hash = hash_password(password)
+                db.commit()
+                print("rotated demo user password")
+        else:
             db.add(
                 User(
                     email_lookup=email_lookup_key(email),

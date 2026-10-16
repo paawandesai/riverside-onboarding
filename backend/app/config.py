@@ -18,6 +18,8 @@ class Settings(BaseSettings):
     demo_retention_hours: int = 24
 
     database_url: str
+    # Managed Postgres (Azure) requires TLS; local and CI databases don't.
+    database_ssl: bool = False
 
     # The project environment stores the key as ANTHROPIC_RIVERSIDE_API_KEY; ANTHROPIC_API_KEY also works.
     anthropic_api_key: SecretStr | None = Field(

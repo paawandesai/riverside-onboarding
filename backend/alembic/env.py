@@ -1,7 +1,5 @@
 from logging.config import fileConfig
 
-from sqlalchemy import engine_from_config, pool
-
 from alembic import context
 
 # this is the Alembic Config object, which provides
@@ -19,7 +17,7 @@ if config.config_file_name is not None:
 # target_metadata = mymodel.Base.metadata
 import app.models  # noqa: E402,F401  (registers tables)
 from app.config import get_settings  # noqa: E402
-from app.db import Base  # noqa: E402
+from app.db import Base, get_engine  # noqa: E402
 
 config.set_main_option("sqlalchemy.url", get_settings().database_url)
 target_metadata = Base.metadata
@@ -61,11 +59,8 @@ def run_migrations_online() -> None:
     and associate a connection with the context.
 
     """
-    connectable = engine_from_config(
-        config.get_section(config.config_ini_section, {}),
-        prefix="sqlalchemy.",
-        poolclass=pool.NullPool,
-    )
+    # The app's engine carries the same TLS settings the API uses (DATABASE_SSL).
+    connectable = get_engine()
 
     with connectable.connect() as connection:
         context.configure(connection=connection, target_metadata=target_metadata)
