@@ -116,4 +116,6 @@ docker-image:
     STORAGE_DRIVER: vfs
     BUILDAH_ISOLATION: chroot
   script:
-    - buildah build --layers=false -t "$CI_PROJECT_PATH_SLUG:$CI_COMMIT_SHORT_SHA" .
+    - id -u
+    # The runner blocks new user namespaces, so build in the container's own namespace.
+    - buildah --userns=host build --layers=false --isolation=chroot -t "$CI_PROJECT_PATH_SLUG:$CI_COMMIT_SHORT_SHA" .
