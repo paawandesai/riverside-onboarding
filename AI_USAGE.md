@@ -1,0 +1,37 @@
+# AI usage
+
+## How AI was used to build this
+
+The repository was written with Claude Code, Anthropic's coding agent, working from a written
+brief and guardrails supplied by the author. The exact model and version for each change are
+recorded in that commit's `Co-Authored-By` trailer. Every commit in the history is real; nothing
+was squashed or rewritten.
+
+Claude Code wrote the code, tests, eval harness, Terraform and documentation, ran the test suites,
+evals, load test, license audit and secret scans, and reported the measured numbers in the README
+from those runs. The author chose the stack, the domain (healthcare intake) and the hosting
+(Azure), and set the compliance guardrails the agent followed.
+
+## AI inside the product
+
+| Where | Model | What it does | Guardrails |
+|---|---|---|---|
+| Assistant chat | Claude via the Claude API, model from `ANTHROPIC_MODEL` (default `claude-haiku-5-5`) | Classifies intent, extracts four visit fields, writes a short reply | Strict JSON schema, server-side validation, link stripping, no booking claims, one-way distress override, rule-based fallback, AI disclosure shown to the user |
+
+No other model is used. OCR is Tesseract (not a generative model). The staff summary is a template,
+not model output. No ID image is sent to any model.
+
+## Artifacts generated with AI and not yet independently verified
+
+These were produced by the coding agent. They pass the automated checks listed, but no human
+domain expert has reviewed them.
+
+| Artifact | Automated check | Still needs |
+|---|---|---|
+| Consent text (`backend/app/services/privacy.py`) | Tests assert it is shown before upload and mentions retention | Legal / privacy review |
+| Supportive content and crisis wording (`backend/app/content/support.json`, `SAFETY_REPLY` in `chat.py`) | Tests for triggers and distress override | Clinical review of wording and resources |
+| Assistant system prompt and output schema (`backend/app/services/llm.py`) | Adversarial cases on the fallback path | Run the Claude path of `make eval` with a key |
+| Intent test set (`eval/intents.json`) and injection cases (`eval/adversarial/`) | Used by the eval harness | Review for coverage and realism |
+| Specimen ID generator (`scripts/generate_specimen_ids.py`) and its images in `fixtures/generated-*` | Labels checked by the OCR eval | Comparison against real photo conditions |
+| Rule-based fallback classifier (`backend/app/services/chat.py`) | 30/30 on the set it was tuned on | Accuracy on unseen phrasing |
+| Terraform (`infra/terraform`) | `terraform validate` | A real `plan` and `apply` against the subscription |
