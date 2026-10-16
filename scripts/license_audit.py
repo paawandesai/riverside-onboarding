@@ -1,0 +1,158 @@
+"""License audit for backend (installed venv) and frontend (package-lock.json). Writes LICENSES.md.
+
+Run with the backend venv's interpreter so installed package metadata is visible:
+    backend/.venv/bin/python scripts/license_audit.py
+
+With --check, compares against the committed LICENSES.md instead of writing it.
+Exits non-zero if a package that ships with the app has a disallowed or unknown license.
+Dev-only tools are listed for transparency but do not fail the audit (they are not distributed).
+"""
+
+import json
+import re
+import sys
+from datetime import UTC, datetime
+from importlib import metadata
+from pathlib import Path
+
+ROOT = Path(__file__).resolve().parent.parent
+STRONG_COPYLEFT = re.compile(r"AGPL|Affero|(?<!L)GPL|General Public License", re.I)
+WEAK_COPYLEFT = re.compile(r"LGPL|Lesser|Library General|MPL|Mozilla|EPL|Eclipse|CDDL", re.I)
+NOT_COMMERCIAL = re.compile(r"SSPL|BUSL|Business Source|Commons Clause|CC-BY-NC|Non-?Commercial|research only", re.I)
+
+
+def _canon(name: str) -> str:
+    return re.sub(r"[-_.]+", "-", name).lower()
+
+
+def python_license(dist: metadata.Distribution) -> str:
+    md = dist.metadata
+    if expr := md.get("License-Expression"):
+        return expr
+    classifiers = [c.split("::")[-1].strip() for c in md.get_all("Classifier") or [] if c.startswith("License ::")]
+    classifiers = [c for c in classifiers if c != "OSI Approved"]
+    if classifiers:
+        return " OR ".join(sorted(set(classifiers)))
+    lic = (md.get("License") or "").strip()
+    # Some packages paste the whole license text into this field; keep the first line.
+    return lic.splitlines()[0][:60] if lic else "UNKNOWN"
+
+
+def python_runtime_closure() -> set[str]:
+    wanted = []
+    for line in (ROOT / "backend/requirements.txt").read_text().splitlines():
+        line = line.split("#")[0].strip()
+        if line:
+            wanted.append(_canon(re.split(r"[\[=<>~ ]", line)[0]))
+    seen: set[str] = set()
+    while wanted:
+        name = wanted.pop()
+        if name in seen:
+            continue
+        try:
+            dist = metadata.distribution(name)
+        except metadata.PackageNotFoundError:
+            continue
+        seen.add(name)
+        for req in dist.requires or []:
+            if "extra ==" in req and not re.search(r'extra == "standard"', req):
+                continue
+            wanted.append(_canon(re.split(r"[\[=<>~!; (]", req)[0]))
+    return seen
+
+
+def python_rows() -> list[tuple[str, str, str, bool]]:
+    runtime = python_runtime_closure()
+    rows = {}
+    for dist in metadata.distributions():
+        name = _canon(dist.metadata["Name"])
+        if name in {"pip", "setuptools", "wheel"}:
+            continue
+        rows[name] = (name, dist.version, python_license(dist), name in runtime)
+    return sorted(rows.values())
+
+
+def npm_rows() -> list[tuple[str, str, str, bool]]:
+    lock = json.loads((ROOT / "frontend/package-lock.json").read_text())
+    rows = []
+    for path, pkg in lock["packages"].items():
+        if not path:
+            continue
+        name = path.split("node_modules/")[-1]
+        rows.append((name, pkg.get("version", "?"), pkg.get("license") or "UNKNOWN", not pkg.get("dev", False)))
+    return sorted(set(rows))
+
+
+def classify(lic: str) -> str:
+    if lic == "UNKNOWN":
+        return "unknown"
+    if NOT_COMMERCIAL.search(lic):
+        return "disallowed"
+    if WEAK_COPYLEFT.search(lic):
+        return "review"
+    if STRONG_COPYLEFT.search(lic):
+        return "disallowed"
+    return "ok"
+
+
+def section(title: str, rows: list[tuple[str, str, str, bool]]) -> tuple[list[str], list[str]]:
+    problems = []
+    shipped = [r for r in rows if r[3]]
+    dev = [r for r in rows if not r[3]]
+    out = [f"## {title}", "", f"{len(shipped)} packages ship with the app; {len(dev)} are dev/test tools only.", ""]
+    out += ["### Shipped", "", "| Package | Version | License | Status |", "|---|---|---|---|"]
+    for name, ver, lic, _ in shipped:
+        status = classify(lic)
+        if status in ("disallowed", "unknown"):
+            problems.append(f"{title}: {name} {ver} ({lic})")
+        out.append(f"| {name} | {ver} | {lic} | {status} |")
+    counts: dict[str, int] = {}
+    for _, _, lic, _ in dev:
+        counts[lic] = counts.get(lic, 0) + 1
+    out += ["", "### Dev and test tools (not distributed), by license", "", "| License | Packages |", "|---|---|"]
+    out += [f"| {lic} | {n} |" for lic, n in sorted(counts.items(), key=lambda kv: -kv[1])]
+    flagged = [f"{n} {v} ({lic})" for n, v, lic, _ in dev if classify(lic) != "ok"]
+    if flagged:
+        out += ["", "Dev tools needing a note: " + "; ".join(flagged)]
+    return out + [""], problems
+
+
+def main() -> int:
+    py, py_problems = section("Backend (Python)", python_rows())
+    js, js_problems = section("Frontend (npm)", npm_rows())
+    problems = py_problems + js_problems
+    lines = [
+        "# Third-party licenses",
+        "",
+        f"Generated by `scripts/license_audit.py` on {datetime.now(UTC).date().isoformat()}. "
+        "Licenses come from installed package metadata (Python) and package-lock.json (npm). "
+        "\"review\" means weak copyleft (LGPL/MPL): allowed when used unmodified as a separate library.",
+        "",
+        "System tools outside these lists: Tesseract OCR (Apache-2.0, run as a separate process), "
+        "PostgreSQL (PostgreSQL License), k6 (AGPL-3.0, an external load-test CLI that is not linked or shipped), "
+        "gitleaks (MIT, dev hook only).",
+        "",
+        *py,
+        *js,
+        "## Result",
+        "",
+        "No shipped package has a disallowed or unknown license." if not problems else "Problems:\n" + "\n".join(f"- {p}" for p in problems),
+        "",
+    ]
+    new = "\n".join(lines)
+    target = ROOT / "LICENSES.md"
+    if "--check" in sys.argv:
+        # CI mode: the committed file must match what the current lockfiles produce (date line aside).
+        def body(text: str) -> list[str]:
+            return [ln for ln in text.splitlines() if not ln.startswith("Generated by")]
+
+        if not target.exists() or body(target.read_text()) != body(new):
+            problems.append("LICENSES.md is out of date; run `make licenses` and commit it")
+    else:
+        target.write_text(new)
+    print("\n".join(problems) or "license audit passed")
+    return 1 if problems else 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

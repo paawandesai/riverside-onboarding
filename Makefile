@@ -32,4 +32,4 @@ load:             ## k6: 20 VUs for 60s against BASE_URL (default http://localho
 	k6 run -e BASE_URL=$(or $(BASE_URL),http://localhost:8000) -e INVITE_CODE=$(INVITE_CODE) k6/load.js
 
 licenses:         ## regenerate LICENSES.md
-	./scripts/license_audit.sh
+	backend/.venv/bin/python scripts/license_audit.py
