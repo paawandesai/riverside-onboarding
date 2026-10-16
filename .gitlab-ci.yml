@@ -110,9 +110,10 @@ ocr-eval:
 
 docker-image:
   stage: build
-  image: docker:27.5.1
-  services: ["docker:27.5.1-dind"]
+  # Rootless Buildah: the project runner is not privileged, so Docker-in-Docker can't start.
+  image: quay.io/buildah/stable:v1.43.4-immutable
   variables:
-    DOCKER_TLS_CERTDIR: "/certs"
+    STORAGE_DRIVER: vfs
+    BUILDAH_ISOLATION: chroot
   script:
-    - docker build -t "$CI_PROJECT_PATH_SLUG:$CI_COMMIT_SHORT_SHA" .
+    - buildah build --layers=false -t "$CI_PROJECT_PATH_SLUG:$CI_COMMIT_SHORT_SHA" .
