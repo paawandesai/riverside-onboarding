@@ -13,6 +13,11 @@ router = APIRouter(prefix="/api", tags=["privacy"])
 class ConsentOut(BaseModel):
     active: bool
     version: str | None
+    photo_scan: bool = False
+
+
+class ConsentIn(BaseModel):
+    photo_scan: bool = False
 
 
 @router.get("/consent/text")
@@ -23,16 +28,25 @@ def consent_text() -> dict:
 @router.get("/consent", response_model=ConsentOut)
 def consent_status(user: User = Depends(current_user), db: Session = Depends(get_db)) -> ConsentOut:
     consent = active_consent(db, user.id)
-    return ConsentOut(active=consent is not None, version=consent.version if consent else None)
+    if consent is None:
+        return ConsentOut(active=False, version=None)
+    return ConsentOut(active=True, version=consent.version, photo_scan=consent.photo_scan)
 
 
 @router.post("/consent", response_model=ConsentOut, status_code=201)
-def grant_consent(user: User = Depends(current_user), db: Session = Depends(get_db)) -> ConsentOut:
-    if active_consent(db, user.id) is None:
-        db.add(Consent(user_id=user.id, version=CONSENT_VERSION))
+def grant_consent(body: ConsentIn | None = None, user: User = Depends(current_user), db: Session = Depends(get_db)) -> ConsentOut:
+    """Grant consent, or change the optional ID-photo consent on an active grant."""
+    photo_scan = body.photo_scan if body else False
+    consent = active_consent(db, user.id)
+    if consent is None:
+        consent = Consent(user_id=user.id, version=CONSENT_VERSION, photo_scan=photo_scan)
+        db.add(consent)
         audit(db, "consent_granted", user.id, user.id)
-        db.commit()
-    return ConsentOut(active=True, version=CONSENT_VERSION)
+    elif consent.photo_scan != photo_scan:
+        consent.photo_scan = photo_scan
+        audit(db, "photo_consent_granted" if photo_scan else "photo_consent_withdrawn", user.id, user.id)
+    db.commit()
+    return ConsentOut(active=True, version=consent.version, photo_scan=consent.photo_scan)
 
 
 @router.post("/consent/revoke", response_model=ConsentOut)

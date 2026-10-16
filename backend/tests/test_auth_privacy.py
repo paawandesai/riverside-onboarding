@@ -49,7 +49,10 @@ def test_processing_requires_consent(client):
     assert c.put("/api/intake/identity", json=IDENTITY).status_code == 403
     assert c.post("/api/chat", json={"messages": [{"role": "user", "content": "hi"}]}).status_code == 403
     assert c.post("/api/documents/extract", files={"file": ("a.png", b"x", "image/png")}).status_code == 403
-    assert c.get("/api/consent/text").json()["version"]
+    text = c.get("/api/consent/text").json()
+    assert text["version"]
+    # The short notice itself states Anthropic retention, not only the full notice.
+    assert any("30 days" in p and "2 years" in p for p in text["points"])
 
 
 def test_identity_is_saved_encrypted_and_minor_rejected(user_client, db):

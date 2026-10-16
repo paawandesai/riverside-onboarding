@@ -34,6 +34,8 @@ class Consent(Base):
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=_uuid)
     user_id: Mapped[str] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
     version: Mapped[str] = mapped_column(String(16))
+    # Separate, optional consent to read an ID photo. Declining it never blocks intake.
+    photo_scan: Mapped[bool] = mapped_column(default=False, server_default="false")
     granted_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
     revoked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 

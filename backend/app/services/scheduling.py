@@ -16,7 +16,16 @@ class SlotNotFound(Exception):
     pass
 
 
-def open_slots(db: Session, visit_type: str | None, limit: int = 40) -> list[Slot]:
+def nearest_open(db: Session, slot_id: int, count: int = 3) -> list[Slot]:
+    """The open slots of the same visit type closest in time to a slot that was just taken."""
+    slot = db.get(Slot, slot_id)
+    if slot is None:
+        return []
+    candidates = open_slots(db, slot.visit_type, limit=200)
+    return sorted(candidates, key=lambda s: abs((s.starts_at - slot.starts_at).total_seconds()))[:count]
+
+
+def open_slots(db: Session, visit_type: str | None, limit: int = 200) -> list[Slot]:
     now = datetime.now(UTC)
     taken = select(Booking.slot_id).where(Booking.status == "booked")
     query = select(Slot).where(Slot.starts_at > now, Slot.id.not_in(taken)).order_by(Slot.starts_at).limit(limit)

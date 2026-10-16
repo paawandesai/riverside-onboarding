@@ -6,6 +6,7 @@ import pytest
 from PIL import Image
 
 from app.services import ocr
+from app.services.privacy import CONSENT_VERSION
 from app.services.uploads import MAX_PIXELS, UploadRejected, validate_and_clean
 from tests.conftest import FIXTURES
 
@@ -101,33 +102,42 @@ def test_extracts_clean_golden_card():
         assert result.fields[name].value == expected
 
 
-def test_extract_endpoint_returns_fields_and_never_retains_image(user_client):
+def test_extract_endpoint_returns_fields_and_never_retains_image(scan_client):
     labels = json.load(open(os.path.join(GOLDEN, "labels.json")))["items"]
     item = labels[0]
     with open(os.path.join(GOLDEN, item["file"]), "rb") as fh:
-        r = user_client.post("/api/documents/extract", files={"file": ("card.jpg", fh, "image/jpeg")})
+        r = scan_client.post("/api/documents/extract", files={"file": ("card.jpg", fh, "image/jpeg")})
     assert r.status_code == 200
     body = r.json()
     assert body["image_retained"] is False
     assert set(body["fields"]) == {"full_name", "dob", "address"}
 
 
-def test_extract_endpoint_rejects_non_image_with_message(user_client):
-    r = user_client.post("/api/documents/extract", files={"file": ("notes.txt", b"hello there", "text/plain")})
+def test_extract_endpoint_rejects_non_image_with_message(scan_client):
+    r = scan_client.post("/api/documents/extract", files={"file": ("notes.txt", b"hello there", "text/plain")})
     assert r.status_code == 422 and "supported image" in r.json()["detail"]
 
 
-def test_blank_image_offers_manual_entry(user_client):
-    r = user_client.post("/api/documents/extract", files={"file": ("blank.png", _png((800, 500)), "image/png")})
+def test_blank_image_offers_manual_entry(scan_client):
+    r = scan_client.post("/api/documents/extract", files={"file": ("blank.png", _png((800, 500)), "image/png")})
     assert r.status_code == 200
     assert r.json()["missing"] == ["full_name", "dob", "address"]
     assert "type them in" in r.json()["message"]
 
 
-def test_ocr_engine_failure_degrades_to_manual(user_client, monkeypatch):
+def test_ocr_engine_failure_degrades_to_manual(scan_client, monkeypatch):
     def boom(_):
         raise ocr.OcrUnavailable("TesseractNotFoundError")
 
     monkeypatch.setattr(ocr, "extract_fields", boom)
-    r = user_client.post("/api/documents/extract", files={"file": ("a.png", _png(), "image/png")})
+    r = scan_client.post("/api/documents/extract", files={"file": ("a.png", _png(), "image/png")})
     assert r.status_code == 503 and "type your details" in r.json()["detail"]
+
+
+def test_extract_needs_separate_photo_consent(user_client):
+    with open(os.path.join(GOLDEN, "specimen-01.jpg"), "rb") as fh:
+        r = user_client.post("/api/documents/extract", files={"file": ("card.jpg", fh, "image/jpeg")})
+    assert r.status_code == 403 and "type your details" in r.json()["detail"]
+    # Turning photo consent on later works without a second full consent.
+    assert user_client.post("/api/consent", json={"photo_scan": True}).json()["photo_scan"] is True
+    assert user_client.get("/api/consent").json() == {"active": True, "version": CONSENT_VERSION, "photo_scan": True}

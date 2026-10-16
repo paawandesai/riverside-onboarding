@@ -21,6 +21,9 @@ from app.db import Base, get_db, get_engine  # noqa: E402
 from app.main import app  # noqa: E402
 from app.services.scheduling import seed_slots  # noqa: E402
 
+# The SPA sends this on every mutating call; the CSRF guard rejects requests without it.
+API_HEADERS = {"X-Requested-With": "onboarding-app"}
+
 FIXTURES = os.path.join(os.path.dirname(__file__), "..", "..", "fixtures")
 
 
@@ -54,20 +57,28 @@ def slots(db):
 
 @pytest.fixture
 def client():
-    with TestClient(app) as c:
+    with TestClient(app, headers=API_HEADERS) as c:
         yield c
 
 
-def make_client(email: str, consent: bool = True) -> TestClient:
-    c = TestClient(app)
+def make_client(email: str, consent: bool = True, photo_scan: bool = False) -> TestClient:
+    c = TestClient(app, headers=API_HEADERS)
     r = c.post(
         "/api/auth/signup",
         json={"email": email, "password": "correct-horse-battery", "invite_code": "test-invite", "adult_attestation": True},
     )
     assert r.status_code == 201, r.text
     if consent:
-        assert c.post("/api/consent").status_code == 201
+        assert c.post("/api/consent", json={"photo_scan": photo_scan}).status_code == 201
     return c
+
+
+@pytest.fixture
+def scan_client(client):
+    """A patient who also agreed to have an ID photo read."""
+    c = make_client("patient.scan@example.com", photo_scan=True)
+    yield c
+    c.close()
 
 
 @pytest.fixture

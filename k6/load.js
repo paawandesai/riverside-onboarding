@@ -36,16 +36,22 @@ export const options = {
   },
 };
 
+// The API's CSRF guard requires this header on every mutating call, as the SPA sends it.
+const CSRF = { "X-Requested-With": "onboarding-app" };
+
 function signup(i) {
   const email = `k6-${Date.now()}-${i}@example.com`;
   const res = http.post(
     `${BASE}/api/auth/signup`,
     JSON.stringify({ email, password: RUN_PASSWORD, invite_code: INVITE, adult_attestation: true }),
-    { headers: { "Content-Type": "application/json" } },
+    { headers: { ...CSRF, "Content-Type": "application/json" } },
   );
   check(res, { "signup 201": (r) => r.status === 201 });
   const cookie = `onboarding_session=${res.cookies.onboarding_session[0].value}`;
-  http.post(`${BASE}/api/consent`, null, { headers: { Cookie: cookie } });
+  // Photo consent is separate and optional; load-test users agree so the OCR scenario can run.
+  http.post(`${BASE}/api/consent`, JSON.stringify({ photo_scan: true }), {
+    headers: { ...CSRF, Cookie: cookie, "Content-Type": "application/json" },
+  });
   return cookie;
 }
 
@@ -58,7 +64,7 @@ export function setup() {
 }
 
 export function apiLoad(data) {
-  const headers = { Cookie: data.cookies[(__VU - 1) % 20], "Content-Type": "application/json" };
+  const headers = { ...CSRF, Cookie: data.cookies[(__VU - 1) % 20], "Content-Type": "application/json" };
   const chat = http.post(
     `${BASE}/api/chat`,
     JSON.stringify({ messages: [{ role: "user", content: "I'd like a check-up for a cough I've had for two weeks" }] }),
@@ -74,14 +80,14 @@ export function ocr(data) {
   const res = http.post(
     `${BASE}/api/documents/extract`,
     { file: http.file(ocrImage, "card.jpg", "image/jpeg") },
-    { headers: { Cookie: data.cookies[20] } },
+    { headers: { ...CSRF, Cookie: data.cookies[20] } },
   );
   ocrTrend.add(res.timings.duration);
   check(res, { "ocr 200": (r) => r.status === 200 });
 }
 
 export function booking(data) {
-  const headers = { Cookie: data.cookies[21], "Content-Type": "application/json" };
+  const headers = { ...CSRF, Cookie: data.cookies[21], "Content-Type": "application/json" };
   const slots = http.get(`${BASE}/api/slots`, { headers }).json();
   const slot = slots[__ITER % slots.length];
   const res = http.post(`${BASE}/api/bookings`, JSON.stringify({ slot_id: slot.id }), { headers });

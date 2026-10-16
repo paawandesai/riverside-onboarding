@@ -25,12 +25,22 @@ async def lifespan(_: FastAPI):
     yield
 
 
+CSRF_HEADER = "X-Requested-With"
+CSRF_VALUE = "onboarding-app"
+# The SPA is built without inline scripts; blob: is for the ID photo preview.
+CSP = (
+    "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' blob: data:; font-src 'self'; "
+    "connect-src 'self'; object-src 'none'; base-uri 'none'; form-action 'self'; frame-ancestors 'none'"
+)
+
+
 def create_app() -> FastAPI:
     settings = get_settings()
     app = FastAPI(
         title="Patient Onboarding Assistant (demo)",
         lifespan=lifespan,
-        docs_url="/api/docs",
+        # Interactive docs only in development (Swagger UI needs inline scripts the CSP blocks).
+        docs_url="/api/docs" if settings.app_env == "development" else None,
         redoc_url=None,
         openapi_url="/api/openapi.json",
     )
@@ -39,8 +49,17 @@ def create_app() -> FastAPI:
         allow_origins=settings.cors_origin_list,
         allow_credentials=True,
         allow_methods=["GET", "POST", "PUT", "DELETE"],
-        allow_headers=["Content-Type"],
+        allow_headers=["Content-Type", CSRF_HEADER],
     )
+
+    @app.middleware("http")
+    async def csrf_guard(request: Request, call_next):
+        # Mutating API calls must carry a custom header. Browsers can't add one cross-site without a
+        # CORS preflight, which only our own origins pass. Complements the SameSite=Lax cookie.
+        if request.method in ("POST", "PUT", "PATCH", "DELETE") and request.url.path.startswith("/api/"):
+            if request.headers.get(CSRF_HEADER) != CSRF_VALUE:
+                return JSONResponse(status_code=403, content={"detail": "Please reload the page and try again."})
+        return await call_next(request)
 
     @app.middleware("http")
     async def request_log(request: Request, call_next):
@@ -68,6 +87,10 @@ def create_app() -> FastAPI:
         response.headers["X-Request-ID"] = request_id
         response.headers["X-Content-Type-Options"] = "nosniff"
         response.headers["Referrer-Policy"] = "no-referrer"
+        if not request.url.path.startswith("/api/docs"):
+            response.headers["Content-Security-Policy"] = CSP
+        response.headers["Permissions-Policy"] = "camera=(self), microphone=(), geolocation=()"
+        response.headers["X-Frame-Options"] = "DENY"
         response.headers["Cache-Control"] = "no-store"
         if settings.demo_mode:
             response.headers["X-Robots-Tag"] = "noindex, nofollow"

@@ -3,6 +3,7 @@ import time
 from datetime import datetime
 
 from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -49,8 +50,13 @@ def list_slots(
     return [_slot_out(s) for s in scheduling.open_slots(db, visit_type)]
 
 
-@router.post("/bookings", response_model=BookingOut, status_code=201)
-def create_booking(body: BookIn, user: User = Depends(current_user), db: Session = Depends(get_db)) -> BookingOut:
+class ConflictOut(BaseModel):
+    detail: str
+    alternatives: list[SlotOut]
+
+
+@router.post("/bookings", response_model=BookingOut, status_code=201, responses={409: {"model": ConflictOut}})
+def create_booking(body: BookIn, user: User = Depends(current_user), db: Session = Depends(get_db)) -> BookingOut | JSONResponse:
     started = time.perf_counter()
     try:
         booking = scheduling.book(db, user.id, body.slot_id)
@@ -58,7 +64,10 @@ def create_booking(body: BookIn, user: User = Depends(current_user), db: Session
         raise HTTPException(status_code=404, detail="That time isn't available.") from None
     except scheduling.SlotUnavailable:
         log_event(logger, "booking_conflict", component="scheduling", outcome="conflict", user_id=user.id)
-        raise HTTPException(status_code=409, detail="Someone just booked that time. Please pick another.") from None
+        # Offer the closest open times so the patient doesn't have to start over.
+        alternatives = [_slot_out(s) for s in scheduling.nearest_open(db, body.slot_id)]
+        conflict = ConflictOut(detail="Someone just booked that time. The closest open times are below.", alternatives=alternatives)
+        return JSONResponse(status_code=409, content=conflict.model_dump(mode="json"))
     log_event(
         logger,
         "booking_created",

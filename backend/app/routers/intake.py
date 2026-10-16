@@ -11,7 +11,7 @@ from sqlalchemy.orm import Session
 from app.config import get_settings
 from app.db import get_db
 from app.logging_config import log_event
-from app.models import IntakeRecord, User
+from app.models import Booking, IntakeRecord, User
 from app.security import current_user, decrypt_json, decrypt_str, encrypt_json, encrypt_str
 from app.services import health_state, ocr
 from app.services.chat import assessment_summary
@@ -27,6 +27,13 @@ FIELD_SOURCES = {"ocr_confirmed", "ocr_edited", "manual"}
 def require_consent(user: User = Depends(current_user), db: Session = Depends(get_db)) -> User:
     if active_consent(db, user.id) is None:
         raise HTTPException(status_code=403, detail="Please review and accept the consent notice first.")
+    return user
+
+
+def require_photo_consent(user: User = Depends(current_user), db: Session = Depends(get_db)) -> User:
+    consent = active_consent(db, user.id)
+    if consent is None or not consent.photo_scan:
+        raise HTTPException(status_code=403, detail="Turn on ID scanning on the consent step to use a photo, or type your details instead.")
     return user
 
 
@@ -56,7 +63,7 @@ class ExtractOut(BaseModel):
 async def extract_document(
     request: Request,
     file: UploadFile = File(...),
-    user: User = Depends(require_consent),
+    user: User = Depends(require_photo_consent),
 ) -> ExtractOut:
     """Read name, DOB and address from an ID photo. The image is processed in memory and discarded."""
     max_bytes = get_settings().max_upload_mb * 1024 * 1024
@@ -188,6 +195,29 @@ def save_assessment(body: AssessmentIn, user: User = Depends(require_consent), d
     record.assessment_confirmed_at = datetime.now(UTC)
     db.commit()
     return _out(record)
+
+
+class ProgressOut(BaseModel):
+    consent: bool
+    photo_scan: bool
+    assessment_done: bool
+    identity_done: bool
+    booked: bool
+
+
+@router.get("/progress", response_model=ProgressOut)
+def progress(user: User = Depends(current_user), db: Session = Depends(get_db)) -> ProgressOut:
+    """Which steps are done, so a returning patient resumes where they left off. Flags only, no data."""
+    consent = active_consent(db, user.id)
+    record = db.scalar(select(IntakeRecord).where(IntakeRecord.user_id == user.id))
+    booked = db.scalar(select(Booking.id).where(Booking.user_id == user.id, Booking.status == "booked")) is not None
+    return ProgressOut(
+        consent=consent is not None,
+        photo_scan=bool(consent and consent.photo_scan),
+        assessment_done=bool(record and record.assessment_confirmed_at),
+        identity_done=bool(record and record.identity_confirmed_at),
+        booked=booked,
+    )
 
 
 @router.get("/intake", response_model=IntakeOut)

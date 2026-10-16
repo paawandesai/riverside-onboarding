@@ -14,7 +14,9 @@ IDLE_SECONDS_THRESHOLD = 45
 CONTENT_PATH = Path(__file__).resolve().parent.parent / "content" / "support.json"
 
 # Highest priority first: safety outranks everything else.
-TRIGGER_PRIORITY = ("distress", "upload_failed", "ocr_low_confidence", "booking_conflict", "long_pause")
+TRIGGER_PRIORITY = ("distress", "llm_unavailable", "upload_failed", "ocr_low_confidence", "booking_conflict", "long_pause")
+# One conflict is handled inline with alternative times; repeated conflicts get the support card.
+BOOKING_CONFLICTS_THRESHOLD = 2
 
 
 @dataclass
@@ -22,8 +24,9 @@ class Signals:
     idle_seconds: float = 0
     upload_failed: bool = False
     ocr_low_confidence: bool = False
-    booking_conflict: bool = False
+    booking_conflicts: int = 0
     distress: bool = False
+    llm_unavailable: bool = False
 
 
 @lru_cache
@@ -36,7 +39,8 @@ def active_triggers(signals: Signals) -> list[str]:
         "distress": signals.distress,
         "upload_failed": signals.upload_failed,
         "ocr_low_confidence": signals.ocr_low_confidence,
-        "booking_conflict": signals.booking_conflict,
+        "llm_unavailable": signals.llm_unavailable,
+        "booking_conflict": signals.booking_conflicts >= BOOKING_CONFLICTS_THRESHOLD,
         "long_pause": signals.idle_seconds >= IDLE_SECONDS_THRESHOLD,
     }
     return [t for t in TRIGGER_PRIORITY if active[t]]

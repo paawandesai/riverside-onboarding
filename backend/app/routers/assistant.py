@@ -50,8 +50,9 @@ class SignalsIn(BaseModel):
     idle_seconds: float = Field(default=0, ge=0, le=86400)
     upload_failed: bool = False
     ocr_low_confidence: bool = False
-    booking_conflict: bool = False
+    booking_conflicts: int = Field(default=0, ge=0, le=100)
     distress: bool = False
+    llm_unavailable: bool = False
 
 
 @router.post("/support/evaluate")
