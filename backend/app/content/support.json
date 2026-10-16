@@ -1,0 +1,32 @@
+{
+  "distress": {
+    "title": "You don't have to do this alone",
+    "body": "It sounds like things are hard right now. If you are in danger or thinking about harming yourself, call or text 988 (Suicide & Crisis Lifeline, US) or call 911. You can pause sign-up at any time, and nothing you've entered is lost.",
+    "actions": ["Call or text 988", "Pause and come back later", "Ask for a person to call me"],
+    "urgent": true
+  },
+  "upload_failed": {
+    "title": "That photo didn't work, and that's okay",
+    "body": "Photos of IDs can be tricky. You can try again in brighter light with the card flat, or skip the photo and type your details instead. Both ways finish sign-up.",
+    "actions": ["Try another photo", "Type my details instead"],
+    "urgent": false
+  },
+  "ocr_low_confidence": {
+    "title": "Please double-check a few details",
+    "body": "We filled in what we could read from your photo. Fields marked for review may be wrong. Please check them and fix anything that isn't right before you continue.",
+    "actions": ["Review highlighted fields"],
+    "urgent": false
+  },
+  "booking_conflict": {
+    "title": "Someone just took that time",
+    "body": "That appointment was booked a moment ago. Here are the next open times. Your other answers are saved.",
+    "actions": ["Show open times"],
+    "urgent": false
+  },
+  "long_pause": {
+    "title": "Take your time",
+    "body": "There's no rush. Your progress is saved as you go. If a question is unclear, you can skip it and a member of our team will help when you visit.",
+    "actions": ["Continue", "Skip this question"],
+    "urgent": false
+  }
+}

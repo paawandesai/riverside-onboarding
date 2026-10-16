@@ -1,0 +1,275 @@
+{
+  "description": "Generated synthetic SPECIMEN cards. Fictional people, issuer and template. Not provided by the brief.",
+  "items": [
+    {
+      "file": "specimen-01.jpg",
+      "category": "clean_scan",
+      "expected": {
+        "full_name": "DAKOTA BRAMBLE",
+        "dob": "1979-01-20",
+        "address": "1198 FOXGLOVE PL, FENWICK FALLS PA 15196"
+      }
+    },
+    {
+      "file": "specimen-02.jpg",
+      "category": "clean_scan",
+      "expected": {
+        "full_name": "MARLOWE OAKHURST",
+        "dob": "1953-05-13",
+        "address": "1156 BIRCHWOOD AVE, BRAMBLETON OH 44192"
+      }
+    },
+    {
+      "file": "specimen-03.jpg",
+      "category": "clean_scan",
+      "expected": {
+        "full_name": "SKYLER BRAMBLE",
+        "dob": "1961-02-08",
+        "address": "9467 HERON POINT RD, FENWICK FALLS PA 15506"
+      }
+    },
+    {
+      "file": "specimen-04.jpg",
+      "category": "clean_scan",
+      "expected": {
+        "full_name": "MARLOWE ELLSWORTH",
+        "dob": "1961-12-12",
+        "address": "8870 LANTERN WAY, LAKEMERE MI 49684"
+      }
+    },
+    {
+      "file": "specimen-05.jpg",
+      "category": "clean_scan",
+      "expected": {
+        "full_name": "ELLIS DUNMORE",
+        "dob": "2001-03-31",
+        "address": "8986 LANTERN WAY, FENWICK FALLS PA 15677"
+      }
+    },
+    {
+      "file": "specimen-06.jpg",
+      "category": "clean_scan",
+      "expected": {
+        "full_name": "FINLEY PEMBERTON",
+        "dob": "1997-09-14",
+        "address": "9605 WILLOW BEND BLVD, SUTTON GROVE IN 46470"
+      }
+    },
+    {
+      "file": "specimen-07.jpg",
+      "category": "clean_scan",
+      "expected": {
+        "full_name": "SKYLER KESTREL",
+        "dob": "1971-11-25",
+        "address": "8616 WILLOW BEND BLVD, BRAMBLETON OH 44996"
+      }
+    },
+    {
+      "file": "specimen-08.jpg",
+      "category": "clean_scan",
+      "expected": {
+        "full_name": "LENNON OAKHURST",
+        "dob": "1956-07-26",
+        "address": "2714 MILLBROOK ST, BRAMBLETON OH 44255"
+      }
+    },
+    {
+      "file": "specimen-09.jpg",
+      "category": "clean_scan",
+      "expected": {
+        "full_name": "SKYLER LANGLEY",
+        "dob": "1956-12-18",
+        "address": "5584 MILLBROOK ST, WESTBURY PINES WI 53708"
+      }
+    },
+    {
+      "file": "specimen-10.jpg",
+      "category": "clean_scan",
+      "expected": {
+        "full_name": "MORGAN BRAMBLE",
+        "dob": "1974-03-21",
+        "address": "5084 HERON POINT RD, SUTTON GROVE IN 46797"
+      }
+    },
+    {
+      "file": "specimen-11.jpg",
+      "category": "phone_photo",
+      "expected": {
+        "full_name": "AVERY PEMBERTON",
+        "dob": "1984-08-11",
+        "address": "5835 OTTER CREEK LN, LAKEMERE MI 49725"
+      }
+    },
+    {
+      "file": "specimen-12.jpg",
+      "category": "phone_photo",
+      "expected": {
+        "full_name": "SAGE ELLSWORTH",
+        "dob": "1982-03-10",
+        "address": "1371 OTTER CREEK LN, SUTTON GROVE IN 46254"
+      }
+    },
+    {
+      "file": "specimen-13.jpg",
+      "category": "phone_photo",
+      "expected": {
+        "full_name": "DAKOTA NORCROSS",
+        "dob": "2000-03-05",
+        "address": "6469 LANTERN WAY, SUTTON GROVE IN 46593"
+      }
+    },
+    {
+      "file": "specimen-14.jpg",
+      "category": "phone_photo",
+      "expected": {
+        "full_name": "HARPER MERRIWEATHER",
+        "dob": "1983-10-03",
+        "address": "9879 MILLBROOK ST, FENWICK FALLS PA 15585"
+      }
+    },
+    {
+      "file": "specimen-15.jpg",
+      "category": "phone_photo",
+      "expected": {
+        "full_name": "EMERSON CALLOWAY",
+        "dob": "1952-06-05",
+        "address": "4290 FOXGLOVE PL, WESTBURY PINES WI 53475"
+      }
+    },
+    {
+      "file": "specimen-16.jpg",
+      "category": "phone_photo",
+      "expected": {
+        "full_name": "HARPER QUILLON",
+        "dob": "1952-08-07",
+        "address": "4258 BIRCHWOOD AVE, BRAMBLETON OH 44809"
+      }
+    },
+    {
+      "file": "specimen-17.jpg",
+      "category": "phone_photo",
+      "expected": {
+        "full_name": "CASEY NORCROSS",
+        "dob": "1980-11-11",
+        "address": "3277 WILLOW BEND BLVD, BRAMBLETON OH 44282"
+      }
+    },
+    {
+      "file": "specimen-18.jpg",
+      "category": "phone_photo",
+      "expected": {
+        "full_name": "BLAIR STANWICK",
+        "dob": "1981-06-09",
+        "address": "2158 MAPLE GROVE RD, FENWICK FALLS PA 15114"
+      }
+    },
+    {
+      "file": "specimen-19.jpg",
+      "category": "phone_photo",
+      "expected": {
+        "full_name": "REESE THORNBURY",
+        "dob": "1955-06-19",
+        "address": "8478 QUARRY RIDGE CT, LAKEMERE MI 49946"
+      }
+    },
+    {
+      "file": "specimen-20.jpg",
+      "category": "phone_photo",
+      "expected": {
+        "full_name": "TATUM DUNMORE",
+        "dob": "1997-08-12",
+        "address": "9191 MAPLE GROVE RD, WESTBURY PINES WI 53354"
+      }
+    },
+    {
+      "file": "specimen-21.jpg",
+      "category": "skew_glare",
+      "expected": {
+        "full_name": "HARPER STANWICK",
+        "dob": "1972-03-21",
+        "address": "3331 WILLOW BEND BLVD, WESTBURY PINES WI 53240"
+      }
+    },
+    {
+      "file": "specimen-22.jpg",
+      "category": "skew_glare",
+      "expected": {
+        "full_name": "ELLIS ELLSWORTH",
+        "dob": "1960-12-23",
+        "address": "4158 OTTER CREEK LN, FENWICK FALLS PA 15578"
+      }
+    },
+    {
+      "file": "specimen-23.jpg",
+      "category": "skew_glare",
+      "expected": {
+        "full_name": "FINLEY CALLOWAY",
+        "dob": "1967-07-25",
+        "address": "6007 MAPLE GROVE RD, LAKEMERE MI 49446"
+      }
+    },
+    {
+      "file": "specimen-24.jpg",
+      "category": "skew_glare",
+      "expected": {
+        "full_name": "MORGAN IVERSEN",
+        "dob": "1970-07-04",
+        "address": "4467 MAPLE GROVE RD, BRAMBLETON OH 44897"
+      }
+    },
+    {
+      "file": "specimen-25.jpg",
+      "category": "skew_glare",
+      "expected": {
+        "full_name": "HARPER BRAMBLE",
+        "dob": "1979-05-05",
+        "address": "3015 QUARRY RIDGE CT, BRAMBLETON OH 44174"
+      }
+    },
+    {
+      "file": "specimen-26.jpg",
+      "category": "skew_glare",
+      "expected": {
+        "full_name": "BLAIR OAKHURST",
+        "dob": "1951-01-14",
+        "address": "4400 HERON POINT RD, LAKEMERE MI 49232"
+      }
+    },
+    {
+      "file": "specimen-27.jpg",
+      "category": "skew_glare",
+      "expected": {
+        "full_name": "REESE RADCLIFFE",
+        "dob": "1968-06-20",
+        "address": "2926 CEDAR HOLLOW DR, LAKEMERE MI 49455"
+      }
+    },
+    {
+      "file": "specimen-28.jpg",
+      "category": "hard",
+      "expected": {
+        "full_name": "MARLOWE QUILLON",
+        "dob": "1990-02-09",
+        "address": "8956 QUARRY RIDGE CT, BRAMBLETON OH 44618"
+      }
+    },
+    {
+      "file": "specimen-29.jpg",
+      "category": "hard",
+      "expected": {
+        "full_name": "MORGAN IVERSEN",
+        "dob": "1961-08-24",
+        "address": "7069 OTTER CREEK LN, BRAMBLETON OH 44156"
+      }
+    },
+    {
+      "file": "specimen-30.jpg",
+      "category": "hard",
+      "expected": {
+        "full_name": "REESE ASHWORTH",
+        "dob": "1964-02-19",
+        "address": "4324 MILLBROOK ST, LAKEMERE MI 49436"
+      }
+    }
+  ]
+}
