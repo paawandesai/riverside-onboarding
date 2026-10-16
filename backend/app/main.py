@@ -1,4 +1,5 @@
 import logging
+import os
 import time
 import uuid
 from contextlib import asynccontextmanager
@@ -7,6 +8,7 @@ from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+from fastapi.staticfiles import StaticFiles
 
 from app.config import get_settings
 from app.logging_config import configure_logging, log_event
@@ -81,6 +83,9 @@ def create_app() -> FastAPI:
 
     for router in (auth.router, privacy.router, intake.router, assistant.router, scheduling.router, system.router):
         app.include_router(router)
+    # In the container the built frontend is served from the same origin (no CORS needed).
+    if os.path.isdir(settings.static_dir):
+        app.mount("/", StaticFiles(directory=settings.static_dir, html=True), name="frontend")
     return app
 
 

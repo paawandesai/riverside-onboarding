@@ -1,6 +1,6 @@
 from functools import lru_cache
 
-from pydantic import Field, SecretStr
+from pydantic import AliasChoices, Field, SecretStr
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -19,11 +19,15 @@ class Settings(BaseSettings):
 
     database_url: str
 
-    anthropic_api_key: SecretStr | None = None
+    # The project environment stores the key as ANTHROPIC_RIVERSIDE_API_KEY; ANTHROPIC_API_KEY also works.
+    anthropic_api_key: SecretStr | None = Field(
+        default=None, validation_alias=AliasChoices("ANTHROPIC_RIVERSIDE_API_KEY", "ANTHROPIC_API_KEY")
+    )
     anthropic_model: str = "claude-haiku-5-5"
     anthropic_effort: str = "low"
     anthropic_timeout_seconds: float = 6.0
 
+    static_dir: str = "static"
     tesseract_cmd: str = "tesseract"
     max_upload_mb: int = Field(default=8, ge=1, le=20)
 

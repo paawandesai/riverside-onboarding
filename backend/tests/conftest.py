@@ -11,6 +11,7 @@ os.environ.setdefault("FIELD_ENCRYPTION_KEY", Fernet.generate_key().decode())
 os.environ.setdefault("INVITE_CODES", "test-invite")
 os.environ.setdefault("DATABASE_URL", "postgresql+pg8000://onboarding:localdev@localhost:5432/onboarding_test")
 os.environ["ANTHROPIC_API_KEY"] = ""  # tests never call the real provider
+os.environ["ANTHROPIC_RIVERSIDE_API_KEY"] = ""
 
 import pytest  # noqa: E402
 from fastapi.testclient import TestClient  # noqa: E402
