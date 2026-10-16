@@ -1,0 +1,7 @@
+title = "riverside-onboarding gitleaks config"
+[extend]
+useDefault = true
+
+[allowlist]
+description = "Placeholder values in .env.example are not secrets"
+paths = ['''\.env\.example$''']

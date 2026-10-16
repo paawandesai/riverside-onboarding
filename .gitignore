@@ -1,0 +1,35 @@
+# Secrets: never commit
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.pfx
+*.tfvars
+!*.tfvars.example
+# Terraform state
+**/.terraform/
+*.tfstate
+*.tfstate.*
+crash.log
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.pytest_cache/
+.ruff_cache/
+.coverage
+coverage.xml
+htmlcov/
+*.egg-info/
+# Node
+node_modules/
+dist/
+coverage/
+# Local uploads / scratch (the app keeps no images on disk, this is a guard)
+uploads/
+tmp/
+eval/results/*.json
+!eval/results/.gitkeep
+.DS_Store
