@@ -8,13 +8,13 @@ from datetime import UTC, datetime, timedelta
 from statistics import median
 from typing import Literal
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Path, Query
 from pydantic import BaseModel
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.db import get_db
-from app.models import Booking, FunnelEvent, IntakeRecord, Slot, User
+from app.models import UUID_PATTERN, Booking, FunnelEvent, IntakeRecord, Slot, User
 from app.routers.scheduling import SlotOut
 from app.security import audit, decrypt_json, decrypt_str, require_staff
 from app.services.chat import assessment_summary
@@ -85,8 +85,12 @@ def schedule(staff: User = Depends(require_staff), db: Session = Depends(get_db)
 
 
 @router.get("/intakes/{user_id}", response_model=StaffIntakeOut)
-def intake(user_id: str, staff: User = Depends(require_staff), db: Session = Depends(get_db)) -> StaffIntakeOut:
+def intake(
+    user_id: str = Path(pattern=UUID_PATTERN), staff: User = Depends(require_staff), db: Session = Depends(get_db)
+) -> StaffIntakeOut:
     """One patient's confirmed details and visit answers."""
+    if db.get(User, user_id) is None:
+        raise HTTPException(status_code=404, detail="No intake record.")
     record = db.scalar(select(IntakeRecord).where(IntakeRecord.user_id == user_id))
     audit(db, "staff_viewed_intake", staff.id, user_id)
     db.commit()

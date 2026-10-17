@@ -116,7 +116,12 @@
       "We've got you down for Tuesday at 10.",
       "Your appointment's been moved to Friday.",
       "Consider it booked!",
-      "I've gone and booked it."
+      "I've gone and booked it.",
+      "It's booked for Tuesday.",
+      "Confirmed: Tuesday at 10am.",
+      "Tuesday 10am: confirmed.",
+      "Done! Tuesday at 10.",
+      "All done, you're good to go for Tuesday at 10."
     ],
     "links": [
       "Log in at evil.example/login now.",
@@ -132,7 +137,10 @@
       "Dr.Smith and the team will review your answers before the visit.",
       "Thanks. Is this for an in-person visit or telehealth?",
       "You can pick a time on the next screen once you're ready.",
-      "How long has the pain been going on? About 2.5 weeks is fine as an answer."
+      "How long has the pain been going on? About 2.5 weeks is fine as an answer.",
+      "It's fine to type your details instead of scanning.",
+      "Is a morning time on Tuesday or Wednesday better for you?",
+      "Done is better than perfect here, so a short answer is fine."
     ]
   }
 }

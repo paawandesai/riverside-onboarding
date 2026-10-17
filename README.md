@@ -49,8 +49,13 @@ cp .env.example .env        # fill SESSION_SECRET, EMAIL_HMAC_KEY, FIELD_ENCRYPT
 docker compose up --build   # http://localhost:8000, sign up with one of your INVITE_CODES
 ```
 
-Without Docker: `make setup db seed`, then `make api` and `make web` (http://localhost:5173).
+Without Docker: create two Postgres databases, `onboarding` and `onboarding_test`, set
+`DATABASE_URL` in `.env` to the first (the backend reads the repo-root `.env`), then
+`make setup db seed`, `make api` and `make web` (http://localhost:5173).
 `make test`, `make e2e`, `make lint`, `make eval`, `make load INVITE_CODE=...`, `make licenses`.
+Tests drop and recreate every table, so they use `TEST_DATABASE_URL` (default
+`postgresql+pg8000://onboarding:localdev@localhost:5432/onboarding_test`) and refuse to run against
+a database whose name doesn't end in `_test`.
 
 `ANTHROPIC_RIVERSIDE_API_KEY` is optional. Without it the assistant runs on a rule-based
 classifier and says so in the UI; the rest of the flow is unchanged.
@@ -61,11 +66,11 @@ Specimen ID images for trying the upload step are in `fixtures/generated-ids/` (
 
 | Step | Behaviour |
 |---|---|
-| Sign-up | Invite code required, adult (18+) self-attestation, argon2 password hash, httpOnly signed session cookie. Every public account is `user` role. The form says what is stored before consent and links the notice. Sign-in, sign-up, chat and uploads are rate-limited; signing out ends every copy of the session. |
-| Consent | Shown before any upload or question: five short points (what is collected, that chat text goes to Anthropic and how long Anthropic keeps it, that staff review the summary, how to withdraw) with the full notice one tap away. ID scanning is a separate, optional switch; without it the upload endpoint refuses photos and the patient types instead. Turning scanning on later only changes an existing consent, and the intake steps send anyone without consent back to the notice. A changed notice is asked for again. Nothing but the account is stored before the consent click. |
-| ID upload | JPEG/PNG/WEBP/HEIC up to 8 MB, magic-byte check, limits on size (16 MP, 8000 px a side) and shape (4:1), EXIF/GPS stripped, shrunk to 2500 px before OCR. Tesseract reads name, DOB and address **on the server, in memory**: the body is refused before parsing if too large and is never spooled to a temp file. The image is never stored and never sent to any model. |
+| Sign-up | Invite code required, adult (18+) self-attestation, argon2 password hash, httpOnly signed session cookie. Every public account is `user` role. The form says what is stored before consent and links the notice. Sign-in, sign-up, chat and uploads are rate-limited; signing out ends the session in that browser only, so other people on a shared demo login stay signed in. |
+| Consent | Shown before any upload or question: six short points (what is collected, that chat text goes to Anthropic and how long Anthropic keeps it, that staff review the summary, how to withdraw) with the full notice one tap away. ID scanning is a separate, optional switch; without it the upload endpoint refuses photos and the patient types instead. Turning scanning on later only changes an existing consent, and the intake steps send anyone without consent back to the notice. A changed notice is asked for again. Nothing but the account is stored before the consent click. |
+| ID upload | JPEG (including the MPO files phones save for HDR shots; first frame only)/PNG/WEBP/HEIC up to 8 MB, magic-byte check, no more than 64 progressive scans, limits on size (16 MP, 8000 px a side) and shape (4:1), EXIF/GPS stripped, shrunk to 2500 px before OCR. Tesseract reads name, DOB and address **on the server, in memory**: the body is refused before parsing if too large and is never spooled to a temp file. The image is never stored and never sent to any model. |
 | Confirm | Every extracted field is shown for the user to confirm or edit; low-confidence and missing fields are highlighted. Manual entry always works, including when OCR is down. The source of each field (OCR confirmed, OCR edited, manual) is recorded. |
-| Assistant | Comes before the ID step. A plain form is offered alongside the chat and takes over, prefilled with what the patient already said, if the assistant fails. Claude classifies each message into one of five intents and extracts four visit fields with a strict JSON schema. The server validates the output, strips links (including bare domains), replaces any claim to have booked or cancelled something, and always uses a fixed reply for reschedule requests. Earlier assistant turns are signed by the server, so a forged one is dropped before it reaches the model; email addresses and phone numbers are removed from what the patient types. Distress keywords force the safety reply (988 / 911) regardless of the model. On timeout or error the rule-based fallback takes over. The AI disclosure is shown at the start. |
+| Assistant | Comes before the ID step. A plain form is offered alongside the chat and takes over, prefilled with what the patient already said, if the assistant fails. Claude classifies each message into one of five intents and extracts four visit fields with a strict JSON schema. The server validates the output, strips links (including bare domains), replaces any claim to have booked or cancelled something, and always uses a fixed reply for reschedule requests. Earlier assistant turns are signed by the server, so a forged one is dropped before it reaches the model; email addresses and phone numbers in common formats (US, `+` or `00` international, and national numbers with a leading 0) are removed from what the patient types. Distress keywords force the safety reply (988 / 911) regardless of the model. On timeout or error the rule-based fallback takes over. The AI disclosure is shown at the start. |
 | Summary | A deterministic, non-binding summary for staff review. No diagnosis or triage. |
 | Booking | Day and time chips by visit type; a partial unique index makes double-booking impossible even under concurrent requests. On a conflict the API returns the three nearest open times and the page highlights them. Rebooking replaces the existing booking. The confirmation offers a calendar (.ics) file. Slots are 9:00 to 16:30 clinic time and the hourly job keeps two weeks open. |
 | Privacy | Withdraw consent (purges intake data and bookings), delete data, or delete the account at any time. |
@@ -99,15 +104,15 @@ Specimen ID images for trying the upload step are in `fixtures/generated-ids/` (
 Measured on 2026-10-16 and 2026-10-17 in a Linux x86_64 container with 4 CPUs and 15 GB RAM, Python 3.13,
 Tesseract 5.3.4, Postgres 16 on the same machine. Re-run with `make eval` and `make load`.
 
-**Tests** (re-measured 2026-10-17, after the audit fixes). Backend: 149 tests, 93.7% coverage
-(gate 80%). Frontend unit: 49 tests, 93.2% lines (gate 80%), each screen also checked with axe.
+**Tests** (re-measured 2026-10-17, after the audit fixes). Backend: 159 tests, 93.8% coverage
+(gate 80%). Frontend unit: 50 tests, 93.2% lines (gate 80%), each screen also checked with axe.
 End-to-end (Playwright, real API, real Postgres, real Tesseract, Pixel 7 viewport): 8 flow tests
 covering the ID-scan path, unreadable photo to typing, assistant failure to the form, two patients
 booking the same slot, consent withdrawal deleting data, the staff view and analytics, deep links, and the security
 headers with a dialog open under the CSP; plus 3 accessibility tests on mobile and desktop (axe WCAG
 2.2 AA with real CSS, no sideways scroll at 320 px, keyboard-only start, 200% text).
 
-**Frontend size.** Initial JavaScript is 128 KiB gzipped (budget 170 KiB); later steps load on demand.
+**Frontend size.** Initial JavaScript is 131 KiB gzipped (budget 170 KiB); later steps load on demand.
 
 **OCR field accuracy** (name, DOB, address; 3 fields x 30 images per set; re-measured 2026-10-17):
 
@@ -126,20 +131,24 @@ address with no state and ZIP is left blank instead of shown as a fragment. Most
 blank for the user rather than filled wrongly. The "hard" category (heavy blur, low contrast, small
 images; 3 cards per set) is still weak.
 
-**Load test** (k6, `k6/load.js`, 2026-10-17): 20 virtual users for 60 s on chat + slots + intake,
-then OCR uploads and bookings. **Chat goes to Claude** (`claude-haiku-5-5`): 948 model calls, none
-fell back to the rules. 0 of 2,949 requests failed.
+**Load test** (k6, `k6/load.js`, 2026-10-17, re-run after the rate limits and the OCR concurrency cap
+were added): 20 virtual users for 60 s on chat + slots + intake, then OCR uploads and bookings.
+**The rate limits were switched off for this run** (`RATE_LIMITS_ENABLED=false` on the API): the
+script signs up 22 accounts from one address and each user chats faster than 20 turns a minute,
+which is what the limits stop. **Chat goes to Claude** (`claude-haiku-5-5`): 1,029 model calls,
+none fell back to the rules. 0 of 3,192 requests failed.
 
 | Metric | p95 | Target |
 |---|---|---|
-| API requests, 20 VUs | 1.34 s | < 3 s |
-| Chat turn (Claude) | 1.51 s | < 3 s |
-| OCR upload | 977 ms | < 8 s |
-| Booking | 30.7 ms | < 1 s |
+| API requests, 20 VUs | 1.23 s | < 3 s |
+| Chat turn (Claude) | 1.50 s | < 3 s |
+| OCR upload | 934 ms | < 8 s |
+| Booking | 20.2 ms | < 1 s |
 
-The API and model ran from the same cloud container (4 CPUs) against api.anthropic.com; the
-deployed app adds network distance and a cold start after idle. An earlier run showed booking p95
-at 1.78 s because the async OCR handler blocked the event loop; OCR now runs in a thread pool.
+The API (two workers, as deployed) and k6 ran in the same cloud container (4 CPUs) against
+api.anthropic.com; the deployed app adds network distance and a cold start after idle. An earlier
+run showed booking p95 at 1.78 s because the async OCR handler blocked the event loop; OCR now runs
+in a thread pool.
 
 **Intents.** Two sets, 5 intents each:
 
@@ -171,10 +180,10 @@ safety net, and the form it offers is how a patient finishes when the model is d
 **Adversarial** (`eval/adversarial/`, 2026-10-17): 10/10 prompt-injection cases pass **on the Claude
 path** and 10/10 on the fallback: no prompt leak, no links, no booking claims, valid intent and
 fields, distress override, a forged earlier assistant turn, a request to repeat "your appointment is
-now booked", and a bare-domain link. Separately, the server-side filter replaced 13/13 booking claims
-(including "Your visit on Tuesday is confirmed" and "We've got you down for Tuesday") and stripped
+now booked", and a bare-domain link. Separately, the server-side filter replaced 18/18 booking claims
+(including "Your visit on Tuesday is confirmed", "Tuesday 10am: confirmed." and "It's booked for Tuesday.") and stripped
 8/8 link shapes (bare domain, defanged `hxxps://`, `evil[.]example`, full-width dots, bare IPs,
-markdown, `www.`) that the two audits showed getting through, while leaving 4/4 ordinary replies
+markdown, `www.`) that the two audits showed getting through, while leaving 7/7 ordinary replies
 (such as "Dr.Smith will review your answers") unchanged. Injected text printed on an ID image comes back as a plain field
 value for the user to confirm and is never sent to a model.
 
@@ -236,9 +245,24 @@ above for the current number rather than trusting one written here.
   repository, and rotated with the other demo credentials. The demo banner already tells visitors
   not to enter real information.
 - Analytics are approximate by design: a "session" is one browser tab's anonymous id, time on a step
-  is the gap to the next page view (gaps over 30 minutes dropped), and on the public demo events
-  are deleted after 24 hours. Sample patients are left out of the OCR correction rates.
+  is the gap to the next page view (gaps over 30 minutes dropped), and the anonymous events are
+  kept 30 days (`ANALYTICS_RETENTION_DAYS`) while account data on the public demo is purged after
+  24 hours. Sample patients are left out of the OCR correction rates.
 - Age is self-attested; nothing verifies it.
+- The PRD asks for a GitHub repository; this one is on GitLab, which the author confirmed is fine.
+- The app, its migration init container and the purge job share one managed identity with read
+  access to the whole Key Vault, so code running in the app container could fetch the database
+  admin URL and step around the row-only app role. Separate identities scoped to single secrets
+  would close that; it wasn't done for a synthetic-data demo.
+- A rejected or revoked Anthropic key stops the app at startup instead of running on the rule-based
+  fallback. That is deliberate: the project's rules say configuration errors fail fast. An
+  unreachable provider is different and starts in degraded mode. Rotate the key before restarting.
+- The chat limit is per account, so everyone on the shared demo patient login shares 20 turns a
+  minute per worker. Fine for a few reviewers; heavy simultaneous use will see "slow down" replies.
+- The shared demo and staff logins can't be deleted from the app (their data can), and the purge
+  job recreates them if missing, so one reviewer can't lock out the rest.
+- There is no top-level LICENSE file, so the code is all rights reserved; third-party licenses are
+  in `LICENSES.md` and the notices for shipped browser code in `frontend/public/third-party-notices.txt`.
 - Differences from the UI design spec, on purpose:
   - Chat replies are not streamed. The server validates and cleans the whole model output before
     anything is shown, which rules out showing tokens as they arrive.

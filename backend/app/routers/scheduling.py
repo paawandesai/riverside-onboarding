@@ -2,7 +2,7 @@ import logging
 import time
 from datetime import datetime
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Path, Query
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
 from sqlalchemy import select
@@ -10,7 +10,7 @@ from sqlalchemy.orm import Session
 
 from app.db import get_db
 from app.logging_config import log_event
-from app.models import Booking, Slot, User
+from app.models import UUID_PATTERN, Booking, Slot, User
 from app.routers.intake import require_consent
 from app.security import current_user
 from app.services import scheduling
@@ -93,6 +93,8 @@ def my_bookings(user: User = Depends(current_user), db: Session = Depends(get_db
 
 
 @router.post("/bookings/{booking_id}/cancel", status_code=204)
-def cancel_booking(booking_id: str, user: User = Depends(require_consent), db: Session = Depends(get_db)) -> None:
+def cancel_booking(
+    booking_id: str = Path(pattern=UUID_PATTERN), user: User = Depends(require_consent), db: Session = Depends(get_db)
+) -> None:
     if not scheduling.cancel(db, user.id, booking_id):
         raise HTTPException(status_code=404, detail="Booking not found.")

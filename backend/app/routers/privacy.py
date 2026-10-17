@@ -5,6 +5,7 @@ from sqlalchemy.orm import Session
 from app.db import get_db
 from app.models import Consent, User
 from app.security import SESSION_COOKIE, audit, current_user
+from app.services.demo import is_shared_login
 from app.services.privacy import CONSENT_TEXT, CONSENT_VERSION, active_consent, delete_account, purge_user_data
 
 router = APIRouter(prefix="/api", tags=["privacy"])
@@ -90,6 +91,9 @@ def delete_my_data(user: User = Depends(current_user), db: Session = Depends(get
 
 @router.delete("/me", status_code=204)
 def delete_me(response: Response, user: User = Depends(current_user), db: Session = Depends(get_db)) -> None:
+    if user.role != "user" or is_shared_login(user):
+        # Other reviewers are using this login; deleting it would lock them all out until a redeploy.
+        raise HTTPException(status_code=403, detail="This shared demo login can't be deleted. You can delete its data instead.")
     delete_account(db, user.id)
     db.commit()
     response.delete_cookie(SESSION_COOKIE, path="/")

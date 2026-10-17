@@ -31,6 +31,11 @@ locals {
     FIELD_ENCRYPTION_KEY = azurerm_key_vault_secret.field_encryption_key.name
     EMAIL_HMAC_KEY       = azurerm_key_vault_secret.email_hmac_key.name
   }
+  # The purge job also re-creates the shared demo logins if they're missing.
+  purge_secret_env = merge(local.job_secret_env, {
+    DEMO_USER_PASSWORD  = azurerm_key_vault_secret.demo_user_password.name
+    DEMO_STAFF_PASSWORD = azurerm_key_vault_secret.demo_staff_password.name
+  })
   # The migration init container connects as the admin and sets up the app's row-only role.
   migrate_secret_env = merge(local.job_secret_env, {
     DATABASE_URL     = azurerm_key_vault_secret.migration_database_url.name
@@ -199,7 +204,7 @@ resource "azurerm_container_app_job" "purge" {
   }
 
   dynamic "secret" {
-    for_each = { for k, v in local.vault_secrets : k => v if contains(values(local.job_secret_env), k) }
+    for_each = { for k, v in local.vault_secrets : k => v if contains(values(local.purge_secret_env), k) }
     content {
       name                = secret.key
       key_vault_secret_id = secret.value
@@ -223,7 +228,7 @@ resource "azurerm_container_app_job" "purge" {
         }
       }
       dynamic "env" {
-        for_each = local.job_secret_env
+        for_each = local.purge_secret_env
         content {
           name        = env.key
           secret_name = env.value

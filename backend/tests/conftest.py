@@ -12,7 +12,13 @@ os.environ.setdefault("EMAIL_HMAC_KEY", secrets.token_urlsafe(48))
 # Tests sign up many accounts from one address; the limiter has its own tests that switch it on.
 os.environ.setdefault("RATE_LIMITS_ENABLED", "false")
 os.environ.setdefault("INVITE_CODES", "test-invite")
-os.environ.setdefault("DATABASE_URL", "postgresql+pg8000://onboarding:localdev@localhost:5432/onboarding_test")
+# TEST_DATABASE_URL wins over DATABASE_URL, so a shell set up for the dev server can still run tests.
+os.environ["DATABASE_URL"] = os.environ.get("TEST_DATABASE_URL") or os.environ.get(
+    "DATABASE_URL", "postgresql+pg8000://onboarding:localdev@localhost:5432/onboarding_test"
+)
+# The suite drops and recreates every table, so refuse any database not named for tests.
+if not os.environ["DATABASE_URL"].split("?")[0].rsplit("/", 1)[-1].endswith("_test"):
+    raise SystemExit("Tests drop every table: point TEST_DATABASE_URL at a database whose name ends in _test.")
 os.environ["ANTHROPIC_API_KEY"] = ""  # tests never call the real provider
 os.environ["ANTHROPIC_RIVERSIDE_API_KEY"] = ""
 

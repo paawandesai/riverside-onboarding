@@ -10,6 +10,7 @@ from datetime import UTC, datetime, timedelta
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from app.config import get_settings
 from app.models import Booking, Consent, IntakeRecord, Slot, User
 from app.security import decrypt_str, email_lookup_key, encrypt_json, encrypt_str, end_sessions, hash_password, verify_password
 from app.services.privacy import CONSENT_VERSION
@@ -90,6 +91,13 @@ SAMPLE_PATIENTS = [
         },
     },
 ]
+
+
+def is_shared_login(user: User) -> bool:
+    """The shared demo patient or staff login, which every reviewer uses and nobody may delete."""
+    settings = get_settings()
+    shared = {email_lookup_key(e) for e in (settings.demo_user_email, settings.demo_staff_email) if e}
+    return user.email_lookup in shared
 
 
 def upsert_account(db: Session, email: str, password: str, role: str) -> str:

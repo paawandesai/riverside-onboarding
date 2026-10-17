@@ -7,14 +7,16 @@ Analytics for container logs, and an hourly Container Apps job that purges demo 
 ## Secrets never pass through Terraform
 
 - Generated secrets (DB admin and app passwords, session secret, email lookup key, field
-  encryption key, invite code, demo password) are Terraform **ephemeral** resources passed only to **write-only** arguments
+  encryption key, invite code, demo patient and demo staff passwords) are Terraform **ephemeral** resources passed only to **write-only** arguments
   (`administrator_password_wo`, `value_wo`). They are not in the plan, the state or outputs.
 - The Claude API key is written to Key Vault by `set_secret.py` from an environment variable.
 - The app reads secrets through Key Vault references resolved with its managed identity.
 - The app connects to Postgres as `onboarding_app`, a role that can only read and write rows. An
   init container runs migrations as the admin and creates or updates that role (with a SCRAM
   verifier, so the password never reaches the server in clear text) before each replica starts. The
-  admin URL is only given to that init container.
+  admin URL is only passed to that init container, but the app, the init container and the purge
+  job share one managed identity that can read every secret in the vault, so code running in the
+  app could still fetch it (listed under Known constraints in the main README).
 - Key Vault access can be logged (AuditEvent) to the Log Analytics workspace with
   `-var key_vault_audit_logs=true`, once `Microsoft.Insights` is registered on the subscription
   (prerequisite 3). It is off by default because it wasn't registered for the demo.

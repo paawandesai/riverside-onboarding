@@ -19,6 +19,8 @@ export function Privacy() {
   const queryClient = useQueryClient();
   const draft = useDraft();
   const consent = useQuery({ queryKey: ["consent"], queryFn: api.consent });
+  const me = useQuery({ queryKey: ["me"], queryFn: api.me, retry: false });
+  const shared = me.data?.shared_login ?? false;
   const [confirming, setConfirming] = useState<Action | null>(null);
 
   const forget = (to: string) => {
@@ -70,9 +72,13 @@ export function Privacy() {
         <button type="button" className="btn btn--danger btn--block" onClick={() => setConfirming("data")}>
           {t("privacy.deleteData")}
         </button>
-        <button type="button" className="btn btn--danger btn--block" onClick={() => setConfirming("account")}>
-          {t("privacy.deleteAccount")}
-        </button>
+        {shared ? (
+          <p className="muted small">{t("privacy.sharedLogin")}</p>
+        ) : (
+          <button type="button" className="btn btn--danger btn--block" onClick={() => setConfirming("account")}>
+            {t("privacy.deleteAccount")}
+          </button>
+        )}
         <button type="button" className="btn btn--secondary btn--block" onClick={() => void signOut()}>
           {t("privacy.signOut")}
         </button>

@@ -24,7 +24,11 @@ MAX_ASPECT = 4.0
 # Cleaned images are shrunk to this longest side; OCR needs far less, and memory scales with area.
 WORK_SIDE = 2500
 
-ALLOWED_FORMATS = {"JPEG", "PNG", "WEBP", "HEIF", "HEIC"}
+# MPO is what many phones save for HDR or portrait shots: a JPEG with extra frames. Only the first is read.
+ALLOWED_FORMATS = {"JPEG", "MPO", "PNG", "WEBP", "HEIF", "HEIC"}
+# A progressive JPEG usually has about ten scans; a crafted one with thousands makes Pillow redecode
+# the whole image per scan and stalls the worker. Start-of-scan markers can't occur inside entropy data.
+MAX_JPEG_SCANS = 64
 # Magic-byte prefixes, checked before Pillow parses anything.
 _MAGIC = (
     b"\xff\xd8\xff",  # JPEG
@@ -62,6 +66,8 @@ def validate_and_clean(data: bytes, max_bytes: int) -> CleanImage:
             fmt = (probe.format or "").upper()
             if fmt not in ALLOWED_FORMATS:
                 raise UploadRejected("That image format isn't supported. Please upload a JPEG, PNG, WEBP or HEIC photo.")
+            if fmt in {"JPEG", "MPO"} and data.count(b"\xff\xda") > MAX_JPEG_SCANS:
+                raise UploadRejected("We couldn't read that image. Please save it again as a standard JPEG and retry.")
             width, height = probe.size
             if width * height > MAX_PIXELS or max(width, height) > MAX_SIDE:
                 raise UploadRejected("That image is too large to process. Please upload a smaller photo.")

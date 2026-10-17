@@ -92,6 +92,17 @@ test("deleting the account asks first, then clears everything", async () => {
   expect(calls.some((c) => c.method === "DELETE" && c.url === "/api/me")).toBe(true);
 });
 
+test("the shared demo login can delete its data but not the account itself", async () => {
+  mockFetch({
+    "GET /api/auth/me": { body: { ...ME, shared_login: true } },
+    "GET /api/consent": { body: { active: true, version: "2026-10-v5", photo_scan: false } },
+  });
+  renderApp("/privacy");
+  expect(await screen.findByText(/shared demo login other reviewers use/)).toBeInTheDocument();
+  expect(screen.queryByRole("button", { name: "Delete my account" })).not.toBeInTheDocument();
+  expect(screen.getByRole("button", { name: "Delete my details and booking" })).toBeInTheDocument();
+});
+
 test("withdrawing consent purges and photo consent can be switched off", async () => {
   const calls = mockFetch({
     "GET /api/auth/me": { body: ME },

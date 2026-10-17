@@ -1,12 +1,14 @@
 import uuid
 from datetime import UTC, datetime, timedelta
 
+from fastapi.testclient import TestClient
 from sqlalchemy import select
 
+from app.main import app
 from app.models import AuditLog, FunnelEvent, IntakeRecord, User
 from app.security import email_lookup_key
 from app.services.demo import SAMPLE_PATIENTS, seed_sample_patients, upsert_account
-from tests.conftest import make_client
+from tests.conftest import API_HEADERS, make_client
 
 
 def staff_client(db, email="analytics-staff@example.com"):
@@ -129,3 +131,34 @@ def test_staff_accounts_cannot_consent_or_book(db, slots):
 def test_consent_notice_says_demo_staff_can_see_entries(client):
     points = client.get("/api/consent/text").json()["points"]
     assert any("staff login" in p for p in points)
+
+
+def test_shared_demo_logins_cannot_be_deleted_and_purge_restores_them(db, client, monkeypatch):
+    from app.config import get_settings
+    from scripts import purge_demo_data
+
+    monkeypatch.setenv("DEMO_USER_EMAIL", "demo@example.com")
+    monkeypatch.setenv("DEMO_USER_PASSWORD", "demo-password-123")
+    monkeypatch.setenv("DEMO_STAFF_EMAIL", "demo-staff@example.com")
+    monkeypatch.setenv("DEMO_STAFF_PASSWORD", "staff-password-123")
+    get_settings.cache_clear()
+    try:
+        upsert_account(db, "demo@example.com", "demo-password-123", role="user")
+        upsert_account(db, "demo-staff@example.com", "staff-password-123", role="staff")
+        for email, password in (("demo@example.com", "demo-password-123"), ("demo-staff@example.com", "staff-password-123")):
+            c = TestClient(app, headers=API_HEADERS)
+            me = c.post("/api/auth/login", json={"email": email, "password": password}).json()
+            assert me["shared_login"] is True
+            assert c.delete("/api/me").status_code == 403
+        # Even if one disappears some other way, the hourly purge puts it back.
+        db.delete(db.scalar(select(User).where(User.email_lookup == email_lookup_key("demo@example.com"))))
+        db.commit()
+        purge_demo_data.main()
+        ok = client.post("/api/auth/login", json={"email": "demo@example.com", "password": "demo-password-123"})
+        assert ok.status_code == 200
+        # An ordinary account can still delete itself.
+        own = make_client("own@example.com")
+        assert own.get("/api/auth/me").json()["shared_login"] is False
+        assert own.delete("/api/me").status_code == 204
+    finally:
+        get_settings.cache_clear()

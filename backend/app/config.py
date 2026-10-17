@@ -7,7 +7,8 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 class Settings(BaseSettings):
     """All configuration comes from the environment (or a local, git-ignored .env)."""
 
-    model_config = SettingsConfigDict(env_file=".env", extra="ignore")
+    # backend/.env, or the repo-root .env that the README's quick start creates (make runs in backend/).
+    model_config = SettingsConfigDict(env_file=(".env", "../.env"), extra="ignore")
 
     # Safe by default: Secure cookies and no API docs unless an environment says otherwise.
     app_env: str = "production"
@@ -23,6 +24,9 @@ class Settings(BaseSettings):
     # Funnel events are anonymous (no account, no values), so they outlive the demo's 24-hour purge
     # long enough for the staff analytics windows.
     analytics_retention_days: int = 30
+    # Shared demo logins (passwords stay in the seed step's environment). They can't be deleted.
+    demo_user_email: str = ""
+    demo_staff_email: str = ""
     # Appointment times are generated in the clinic's own zone and shown with its name.
     clinic_timezone: str = "America/New_York"
 

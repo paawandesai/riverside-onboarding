@@ -353,3 +353,26 @@ def test_output_filter_cases_from_the_adversarial_eval():
         assert "example" not in cleaned and "1.2.3.4" not in cleaned, reply
     for reply in cases["allowed"]:
         assert chat.sanitize_reply(reply, "ask_question") == reply
+
+
+def test_malformed_ids_in_paths_are_rejected_not_500(user_client, db):
+    for bad in ("%00", "x" * 40, "not-a-uuid"):
+        assert user_client.post(f"/api/bookings/{bad}/cancel").status_code == 422
+    staff = make_client("staff.fuzz@example.com", consent=False)
+    db.get(User, staff.get("/api/auth/me").json()["id"]).role = "staff"
+    db.commit()
+    for bad in ("%00", "x" * 40):
+        assert staff.get(f"/api/staff/intakes/{bad}").status_code == 422
+    # A well-formed id for nobody is a 404 and leaves no audit row behind.
+    assert staff.get("/api/staff/intakes/00000000-0000-0000-0000-000000000000").status_code == 404
+    assert not db.scalars(select(AuditLog).where(AuditLog.action == "staff_viewed_intake")).all()
+
+
+@pytest.mark.parametrize("number", ["020 7946 0958", "07946 095800", "0049 30 123456", "555-0142", "+44 (0)20 7946 0958", "(555) 014-2222"])
+def test_national_and_local_phone_formats_are_removed(number):
+    assert llm.redact(f"ring me on {number} please") == "ring me on [phone removed] please"
+
+
+def test_dates_times_and_amounts_survive_redaction():
+    text = "Since 01/02/2024, about 3-4 times a day, 2019-2024, 10:30, 120/80, 1.5 mg"
+    assert llm.redact(text) == text

@@ -8,6 +8,7 @@ from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.concurrency import run_in_threadpool
 from pydantic import BaseModel, Field, field_validator
 from sqlalchemy import select
+from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.orm import Session
 from starlette.formparsers import MultiPartParser
 
@@ -50,8 +51,9 @@ def require_photo_consent(user: User = Depends(current_user), db: Session = Depe
 def _record(db: Session, user_id: str) -> IntakeRecord:
     record = db.scalar(select(IntakeRecord).where(IntakeRecord.user_id == user_id))
     if record is None:
-        record = IntakeRecord(user_id=user_id, field_sources={})
-        db.add(record)
+        # Two first saves racing for one user must not collide on the unique user_id.
+        db.execute(pg_insert(IntakeRecord).values(user_id=user_id, field_sources={}).on_conflict_do_nothing(index_elements=["user_id"]))
+        record = db.scalar(select(IntakeRecord).where(IntakeRecord.user_id == user_id))
     return record
 
 

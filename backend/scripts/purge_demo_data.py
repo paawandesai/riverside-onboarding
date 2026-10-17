@@ -4,7 +4,8 @@ Runs hourly as a scheduled job (see infra/terraform):
 * accounts created more than DEMO_RETENTION_HOURS ago are deleted with all their data;
 * the shared demo account is kept, and its data is cleared only once nobody has touched it for
   DEMO_RETENTION_HOURS, so a reviewer partway through the flow doesn't lose it;
-* the staff login and the made-up sample patients are kept;
+* the staff login and the made-up sample patients are kept, and both shared demo logins are
+  re-created if missing;
 * anonymous funnel events older than ANALYTICS_RETENTION_DAYS are deleted;
 * appointment slots are topped up so the next two weeks always have open times, and sample
   patients whose visit has passed get a new one (when DEMO_SAMPLE_PATIENTS is set).
@@ -20,7 +21,7 @@ from app.config import get_settings
 from app.db import get_db
 from app.models import Booking, Consent, FunnelEvent, IntakeRecord, RevokedSession, User
 from app.security import SESSION_MAX_AGE_SECONDS, email_lookup_key
-from app.services.demo import seed_sample_patients
+from app.services.demo import seed_sample_patients, upsert_account
 from app.services.privacy import delete_account, purge_user_data
 from app.services.scheduling import prune_off_hours_slots, seed_slots
 
@@ -42,6 +43,11 @@ def main() -> None:
     demo_email = os.environ.get("DEMO_USER_EMAIL")
     keep = email_lookup_key(demo_email) if demo_email else None
     db = next(get_db())
+    # Put the shared demo logins back if they were somehow removed (and keep their passwords current).
+    for prefix, role in (("DEMO_USER", "user"), ("DEMO_STAFF", "staff")):
+        email, password = os.environ.get(f"{prefix}_EMAIL"), os.environ.get(f"{prefix}_PASSWORD")
+        if email and password:
+            upsert_account(db, email, password, role=role)
     deleted = cleared = 0
     for user in db.scalars(select(User).where(User.role == "user", User.synthetic.is_(False))).all():
         if user.email_lookup == keep:

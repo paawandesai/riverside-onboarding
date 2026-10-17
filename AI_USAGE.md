@@ -18,7 +18,7 @@ from those runs. The author chose the stack, the domain (healthcare intake) and 
 |---|---|---|---|
 | Assistant chat | Claude via the Claude API, model from `ANTHROPIC_MODEL` (default `claude-haiku-5-5`) | Classifies intent, extracts four visit fields, writes a short reply | Strict JSON schema, server-side validation, link stripping, no booking claims, fixed reschedule reply, server-signed history, email and phone removal, one-way distress override, rule-based fallback, AI disclosure shown to the user |
 
-No other model is used. OCR is Tesseract (not a generative model). The staff summary is a template,
+No other model is used. OCR is Tesseract (not a generative model): 5.3.0 in the deployed image (Debian bookworm package), 5.3.4 in the development container where the eval numbers were first taken; both give the same field accuracy. The staff summary is a template,
 not model output. No ID image is sent to any model.
 
 ## Artifacts generated with AI and not yet independently verified
@@ -39,3 +39,6 @@ domain expert has reviewed them.
 | Security fixes from the final audit (rate limits, sessions, upload limits, database role, CSP nonce) | Backend and end-to-end tests for each | An independent security review |
 | Staff analytics (`backend/app/routers/staff.py`, `frontend/src/steps/Staff.tsx`) and the made-up sample patients (`backend/app/services/demo.py`) | Backend, unit and end-to-end tests, including that sample patients stay out of the OCR rates | Review of the metric definitions by someone who runs a clinic's intake |
 | HEIC test sample (`fixtures/generated-heic-sample.heic`) | Decoded by the upload test | Nothing further: it only checks that HEIC decodes |
+| License audit and notices (`scripts/license_audit.py`, `scripts/js_notices.py`, `LICENSES.md`, `frontend/public/third-party-notices.txt`) | Run in CI with `--check` | A check by someone who knows license compliance; package metadata can be wrong |
+| Uptime check and report (`.gitlab-ci.yml` uptime job, `scripts/uptime_report.py`) | Scheduled pipeline runs against the live demo | Confirmation that the schedule's history really covers the period being reported |
+| Fixes from the re-audit and final audit (per-browser sign-out, shared-login protection, upload scan limit and MPO support, id validation, wider phone redaction, booking-claim filter, test-database guard) | Backend, unit and end-to-end tests, and `make eval` filter cases | An independent security review |

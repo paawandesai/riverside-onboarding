@@ -145,6 +145,7 @@ licenses:
   script:
     # Regenerate and fail if a shipped package has a disallowed license or LICENSES.md is stale.
     - backend/.venv/bin/python scripts/license_audit.py --check
+    - backend/.venv/bin/python scripts/js_notices.py --check
 
 terraform:
   <<: *skip_on_uptime
@@ -180,7 +181,7 @@ dependency-audit:
   stage: test
   image: python:3.13-slim-bookworm
   # Checks shipped dependencies against public advisory databases (this sends the package list
-  # to PyPI/OSV and the npm registry). Fails on any known Python advisory and on critical npm ones.
+  # to PyPI/OSV and the npm registry). Fails on any known Python advisory and on high or critical npm ones.
   script:
     - pip install --quiet pip-audit==2.10.1
     - pip-audit --requirement backend/requirements.lock --require-hashes --disable-pip

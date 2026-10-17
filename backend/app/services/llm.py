@@ -119,8 +119,14 @@ def verify_model_at_startup() -> None:
 
 
 _EMAIL = re.compile(r"\b[\w.+-]+@[\w-]+(?:\.[\w-]+)*\b")
-# US numbers in any common layout, and international numbers written with a leading +.
-_PHONE = re.compile(r"(?<!\d)(?:\+?1[\s.-]?)?\(?\d{3}\)?[\s.-]?\d{3}[\s.-]?\d{4}(?!\d)|\+\d(?:[\s().-]{0,2}\d){6,14}(?!\d)")
+# US numbers in any common layout (and 7-digit local ones like 555-0142), international numbers written
+# with a leading + or 00, and national numbers with a trunk 0 such as 020 7946 0958 or 07946 095800.
+_PHONE = re.compile(
+    r"(?<!\d)(?:\+?1[\s.-]?)?\(?\d{3}\)?[\s.-]?\d{3}[\s.-]?\d{4}(?!\d)"
+    r"|\+\d(?:[\s().-]{0,2}\d){6,14}(?!\d)"
+    r"|(?<![\d/])0\d(?:[\s().-]{0,2}\d){7,12}(?![\d/])"
+    r"|(?<![\d.-])\d{3}[.-]\d{4}(?![\d.-])"
+)
 
 
 def redact(text: str) -> str:
@@ -183,7 +189,7 @@ def classify_turn(history: list[dict]) -> LlmTurn:
         "llm_call_ok",
         component="llm",
         duration_ms=int((time.perf_counter() - started) * 1000),
-        intent=data.get("intent"),
+        intent=data.get("intent") if data.get("intent") in INTENTS else "invalid",
         model=settings.anthropic_model,
     )
     return LlmTurn(

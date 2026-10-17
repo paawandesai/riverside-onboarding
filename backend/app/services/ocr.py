@@ -362,6 +362,6 @@ def extract_fields(image: Image.Image) -> OcrResult:
 def tesseract_version() -> str | None:
     try:
         pytesseract.pytesseract.tesseract_cmd = get_settings().tesseract_cmd
-        return str(pytesseract.get_tesseract_version())
+        return str(pytesseract.get_tesseract_version(cached=True))
     except Exception:  # noqa: BLE001 - health reporting only
         return None

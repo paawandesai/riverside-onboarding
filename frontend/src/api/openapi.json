@@ -809,6 +809,11 @@
           "role": {
             "title": "Role",
             "type": "string"
+          },
+          "shared_login": {
+            "default": false,
+            "title": "Shared Login",
+            "type": "boolean"
           }
         },
         "required": [
@@ -1482,6 +1487,7 @@
             "name": "booking_id",
             "required": true,
             "schema": {
+              "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
               "title": "Booking Id",
               "type": "string"
             }
@@ -2069,6 +2075,7 @@
             "name": "user_id",
             "required": true,
             "schema": {
+              "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
               "title": "User Id",
               "type": "string"
             }

@@ -756,6 +756,11 @@ export interface components {
             id: string;
             /** Role */
             role: string;
+            /**
+             * Shared Login
+             * @default false
+             */
+            shared_login: boolean;
         };
         /** OcrFieldOut */
         OcrFieldOut: {

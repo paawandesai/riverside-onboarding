@@ -12,6 +12,7 @@ from argon2.exceptions import InvalidHashError, VerificationError, VerifyMismatc
 from cryptography.fernet import Fernet, InvalidToken, MultiFernet
 from fastapi import Depends, HTTPException, Request
 from itsdangerous import BadSignature, SignatureExpired, URLSafeTimedSerializer
+from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.orm import Session
 
 from app.config import get_settings
@@ -140,8 +141,8 @@ def end_sessions(user: User) -> None:
 
 def revoke_session(db: Session, sid: str) -> None:
     """End one sign-in (this browser). Shared demo logins stay signed in elsewhere."""
-    if db.get(RevokedSession, sid) is None:
-        db.add(RevokedSession(sid=sid))
+    # Two sign-outs racing with the same cookie must not collide on the primary key.
+    db.execute(pg_insert(RevokedSession).values(sid=sid).on_conflict_do_nothing(index_elements=["sid"]))
 
 
 def current_user(request: Request, db: Session = Depends(get_db)) -> User:

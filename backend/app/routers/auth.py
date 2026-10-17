@@ -23,6 +23,7 @@ from app.security import (
     revoke_session,
     verify_password,
 )
+from app.services.demo import is_shared_login
 
 router = APIRouter(prefix="/api/auth", tags=["auth"])
 
@@ -42,6 +43,8 @@ class LoginIn(BaseModel):
 class MeOut(BaseModel):
     id: str
     role: str
+    # The shared demo login: its account can't be deleted (its data can).
+    shared_login: bool = False
 
 
 def _set_session(response: Response, user: User) -> None:
@@ -104,7 +107,7 @@ def login(body: LoginIn, request: Request, response: Response, db: Session = Dep
         user.password_hash = hash_password(body.password)
         db.commit()
     _set_session(response, user)
-    return MeOut(id=user.id, role=user.role)
+    return MeOut(id=user.id, role=user.role, shared_login=is_shared_login(user))
 
 
 @router.post("/logout", status_code=204)
@@ -121,4 +124,4 @@ def logout(request: Request, response: Response, db: Session = Depends(get_db)) 
 
 @router.get("/me", response_model=MeOut)
 def me(user: User = Depends(current_user)) -> MeOut:
-    return MeOut(id=user.id, role=user.role)
+    return MeOut(id=user.id, role=user.role, shared_login=is_shared_login(user))

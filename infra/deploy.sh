@@ -7,7 +7,10 @@
 #   ANTHROPIC_RIVERSIDE_API_KEY (optional)  without it the assistant runs in rule-based fallback mode
 #   PROXY_CA (optional)                     CA file for builds behind a TLS-intercepting proxy
 #
-# Extra arguments go to `terraform apply` (for example -auto-approve or -var credentials_version=2).
+# Extra arguments go to `terraform apply` (for example -auto-approve). To rotate the generated
+# credentials, raise the `credentials_version` default in terraform/variables.tf and commit it: a
+# `-var credentials_version=N` on the command line isn't remembered, so the next plain deploy
+# would go back to the default and rotate again.
 set -euo pipefail
 
 for v in ARM_CLIENT_ID ARM_CLIENT_SECRET ARM_TENANT_ID ARM_SUBSCRIPTION_ID TF_STATE_RG TF_STATE_ACCOUNT; do
@@ -43,6 +46,8 @@ build_args=()
 [ -n "${PROXY_CA:-}" ] && build_args+=(--secret "id=proxy_ca,src=$PROXY_CA")
 docker build "${build_args[@]}" -t "$ACR/onboarding:$TAG" "$ROOT"
 printf '%s' "$ARM_CLIENT_SECRET" | docker login "$ACR" --username "$ARM_CLIENT_ID" --password-stdin
+# Don't leave the service principal's registry login in ~/.docker/config.json.
+trap 'docker logout "$ACR" >/dev/null 2>&1 || true' EXIT
 docker push "$ACR/onboarding:$TAG"
 docker logout "$ACR" >/dev/null # don't leave the service principal secret in ~/.docker/config.json
 

@@ -1,5 +1,8 @@
 // Load test for the stated benchmark load: 20 concurrent virtual users for 60 s.
 //   k6 run -e BASE_URL=http://localhost:8000 -e INVITE_CODE=... k6/load.js
+// Run it against an API started with RATE_LIMITS_ENABLED=false: it signs up 22 accounts from one
+// address and chats faster than 20 turns a minute per user, which the limits exist to stop.
+// Never point it at the public demo.
 // Scenarios run one after another:
 //   api_load  20 VUs x 60 s: chat turn + list slots + read intake   (target p95 < 3 s)
 //   ocr       20 sequential ID uploads from the synthetic golden set (target p95 < 8 s)
@@ -47,7 +50,7 @@ function signup(i) {
     { headers: { ...CSRF, "Content-Type": "application/json" } },
   );
   // Fail the run outright: thresholds over zero samples would otherwise "pass".
-  if (!check(res, { "signup 201": (r) => r.status === 201 })) fail(`signup returned ${res.status}`);
+  if (!check(res, { "signup 201": (r) => r.status === 201 })) fail(`signup returned ${res.status}${res.status === 429 ? " (start the API with RATE_LIMITS_ENABLED=false)" : ""}`);
   const cookie = `onboarding_session=${res.cookies.onboarding_session[0].value}`;
   // Photo consent is separate and optional; load-test users agree so the OCR scenario can run.
   http.post(`${BASE}/api/consent`, JSON.stringify({ photo_scan: true }), {

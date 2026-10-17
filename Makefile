@@ -11,7 +11,7 @@ db:               ## apply migrations
 seed:             ## appointment slots (+ demo user if DEMO_USER_EMAIL/PASSWORD set)
 	cd backend && .venv/bin/python -m scripts.seed $(if $(DEMO_USER_EMAIL),--demo-user,)
 
-staff:            ## local staff account from STAFF_EMAIL / STAFF_PASSWORD (never on the public demo)
+staff:            ## local staff account from STAFF_EMAIL / STAFF_PASSWORD
 	cd backend && .venv/bin/python -m scripts.create_staff
 
 api:
@@ -34,8 +34,9 @@ lint:
 eval:             ## OCR golden + holdout, intent coverage, adversarial cases
 	cd backend && .venv/bin/python ../eval/run_eval.py
 
-load:             ## k6: 20 VUs for 60s against BASE_URL (default http://localhost:8000)
+load:             ## k6: 20 VUs for 60s against BASE_URL; start the API with RATE_LIMITS_ENABLED=false make api
 	k6 run -e BASE_URL=$(or $(BASE_URL),http://localhost:8000) -e INVITE_CODE=$(INVITE_CODE) k6/load.js
 
-licenses:         ## regenerate LICENSES.md
+licenses:         ## regenerate LICENSES.md and the shipped JS notices (needs frontend/node_modules)
 	backend/.venv/bin/python scripts/license_audit.py
+	python3 scripts/js_notices.py

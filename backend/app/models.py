@@ -11,6 +11,10 @@ def _now() -> datetime:
     return datetime.now(UTC)
 
 
+# Ids in URL paths are checked against this before reaching the database.
+UUID_PATTERN = "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+
+
 def _uuid() -> str:
     return str(uuid.uuid4())
 

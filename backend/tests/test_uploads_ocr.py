@@ -164,3 +164,22 @@ def test_extract_needs_separate_photo_consent(user_client):
     # Turning photo consent on later works without a second full consent.
     assert user_client.put("/api/consent/photo", json={"photo_scan": True}).json()["photo_scan"] is True
     assert user_client.get("/api/consent").json() == {"active": True, "version": CONSENT_VERSION, "photo_scan": True}
+
+
+def test_accepts_mpo_first_frame():
+    # Phones save HDR and portrait shots as MPO: a JPEG with extra frames appended.
+    buf = io.BytesIO()
+    first, second = Image.new("RGB", (80, 50), "white"), Image.new("RGB", (40, 25), "black")
+    first.save(buf, "MPO", save_all=True, append_images=[second])
+    clean = validate_and_clean(buf.getvalue(), 10_000_000)
+    assert clean.source_format == "MPO" and clean.image.size == (80, 50)
+
+
+def test_rejects_jpeg_with_too_many_scans():
+    buf = io.BytesIO()
+    Image.new("RGB", (40, 40), "white").save(buf, "JPEG", progressive=True)
+    head, sep, tail = buf.getvalue().partition(b"\xff\xda")
+    # Repeat a start-of-scan segment far beyond what any camera writes.
+    crafted = head + (sep + tail[:-2]) * 80 + b"\xff\xd9"
+    with pytest.raises(UploadRejected, match="standard JPEG"):
+        validate_and_clean(crafted, 10_000_000)
