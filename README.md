@@ -104,7 +104,7 @@ Specimen ID images for trying the upload step are in `fixtures/generated-ids/` (
 Measured on 2026-10-16 and 2026-10-17 in a Linux x86_64 container with 4 CPUs and 15 GB RAM, Python 3.13,
 Tesseract 5.3.4, Postgres 16 on the same machine. Re-run with `make eval` and `make load`.
 
-**Tests** (re-measured 2026-10-17, after the audit fixes). Backend: 159 tests, 93.8% coverage
+**Tests** (re-measured 2026-10-17, after the audit fixes). Backend: 163 tests, 93.8% coverage
 (gate 80%). Frontend unit: 50 tests, 93.2% lines (gate 80%), each screen also checked with axe.
 End-to-end (Playwright, real API, real Postgres, real Tesseract, Pixel 7 viewport): 8 flow tests
 covering the ID-scan path, unreadable photo to typing, assistant failure to the form, two patients
@@ -180,10 +180,10 @@ safety net, and the form it offers is how a patient finishes when the model is d
 **Adversarial** (`eval/adversarial/`, 2026-10-17): 10/10 prompt-injection cases pass **on the Claude
 path** and 10/10 on the fallback: no prompt leak, no links, no booking claims, valid intent and
 fields, distress override, a forged earlier assistant turn, a request to repeat "your appointment is
-now booked", and a bare-domain link. Separately, the server-side filter replaced 18/18 booking claims
+now booked", and a bare-domain link. Separately, the server-side filter replaced 19/19 booking claims
 (including "Your visit on Tuesday is confirmed", "Tuesday 10am: confirmed." and "It's booked for Tuesday.") and stripped
 8/8 link shapes (bare domain, defanged `hxxps://`, `evil[.]example`, full-width dots, bare IPs,
-markdown, `www.`) that the two audits showed getting through, while leaving 7/7 ordinary replies
+markdown, `www.`) that the two audits showed getting through, while leaving 9/9 ordinary replies
 (such as "Dr.Smith will review your answers") unchanged. Injected text printed on an ID image comes back as a plain field
 value for the user to confirm and is never sent to a model.
 
@@ -280,7 +280,7 @@ above for the current number rather than trusting one written here.
 
 | Provider | What it receives | Personal fields | Retention |
 |---|---|---|---|
-| Anthropic (Claude API) | Chat messages about the visit (last 20 turns), system prompt | Free text the user types, which may describe health concerns, sent as typed except that email addresses and phone numbers are removed first. The form fields (name, DOB, address), the account email and the ID image are never sent. Whatever a patient types into the chat is sent, so the chat asks them not to type identifiers. | Up to 30 days by default; up to 2 years for messages flagged by safety systems. Deleting data in the app does not delete Anthropic's copy. |
+| Anthropic (Claude API) | Chat messages about the visit (last 20 turns), system prompt | Free text the user types, which may describe health concerns, sent as typed except that email addresses and phone numbers in common formats are removed first. The form fields (name, DOB, address), the account email and the ID image are never sent. Whatever a patient types into the chat is sent, so the chat asks them not to type identifiers. | Up to 30 days by default; up to 2 years for messages flagged by safety systems. Deleting data in the app does not delete Anthropic's copy. |
 | Microsoft Azure (hosting) | Everything stored by the app | Name, DOB, address (field-encrypted), email (encrypted, plus HMAC for lookup), assessment answers, bookings | Demo data purged after 24 hours by a scheduled job, or immediately on withdrawal/deletion. Postgres backups 7 days. Logs 30 days and contain no personal data. |
 | Tesseract (local) | ID image, in memory | Whatever is printed on the card | None; the image is discarded after the request. |
 

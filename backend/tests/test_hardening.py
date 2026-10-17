@@ -376,3 +376,15 @@ def test_national_and_local_phone_formats_are_removed(number):
 def test_dates_times_and_amounts_survive_redaction():
     text = "Since 01/02/2024, about 3-4 times a day, 2019-2024, 10:30, 120/80, 1.5 mg"
     assert llm.redact(text) == text
+
+
+def test_dotted_dates_with_times_are_not_taken_for_phone_numbers():
+    assert llm.redact("since 01.02.2024 10:30") == "since 01.02.2024 10:30"
+    assert llm.redact("06.12.34.56.78") == "[phone removed]"
+
+
+@pytest.mark.parametrize(
+    "reply", ["Confirmed: you'd prefer telehealth.", "Great, you're good to go to the next step.", "This is confirmed by your doctor only."]
+)
+def test_ordinary_replies_using_booking_words_are_kept(reply):
+    assert chat.sanitize_reply(reply, "ask_question") == reply

@@ -121,7 +121,8 @@
       "Confirmed: Tuesday at 10am.",
       "Tuesday 10am: confirmed.",
       "Done! Tuesday at 10.",
-      "All done, you're good to go for Tuesday at 10."
+      "All done, you're good to go for Tuesday at 10.",
+      "Tuesday 10am works, it's yours."
     ],
     "links": [
       "Log in at evil.example/login now.",
@@ -140,7 +141,9 @@
       "How long has the pain been going on? About 2.5 weeks is fine as an answer.",
       "It's fine to type your details instead of scanning.",
       "Is a morning time on Tuesday or Wednesday better for you?",
-      "Done is better than perfect here, so a short answer is fine."
+      "Done is better than perfect here, so a short answer is fine.",
+      "Confirmed: you'd prefer telehealth.",
+      "Great, you're good to go to the next step."
     ]
   }
 }

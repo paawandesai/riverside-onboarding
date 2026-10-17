@@ -84,11 +84,11 @@ _COMMITMENT = re.compile(
     r"\b(?:got|have|put|pencil+ed|marked|written) you (?:down|in)\b|"
     r"\bconsider it (?:booked|done|scheduled|confirmed|sorted)\b|"
     r"(?:^|[.!?]\s*)(?:all\s+)?(?:booked|scheduled|confirmed|done|reserved)[!.,:]?\s+"
-    r"(?:you|for|at|on|that|\w+day|today|tomorrow|tonight|\d)|"
+    r"(?:for|at|on|that|\w+day|today|tomorrow|tonight|\d)|"
     # "It's booked for Tuesday", "Tuesday 10am: confirmed", "you're good to go for Tuesday"
-    r"\b(?:it|that|this)(?:'s| is| has been| was)\s+(?:all\s+|now\s+)*" + _DONE + r"\b|"
+    r"\b(?:it|that)(?:'s| is| has been| was)\s+(?:all\s+|now\s+)*" + _DONE + r"\b|"
     r"(?:day|am|pm|\d)\s*[:\u2013-]\s*(?:now\s+)?" + _DONE + r"\b|"
-    r"\byou(?:'re| are)\s+(?:all\s+)?good to go\b|"
+    r"\byou(?:'re| are)\s+(?:all\s+)?good to go (?:for|on|at)\b|\bit(?:'s| is) (?:all )?yours\b|"
     r"\bsee you (?:on |at |next |tomorrow|monday|tuesday|wednesday|thursday|friday|saturday|sunday)",
     re.I,
 )

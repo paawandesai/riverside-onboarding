@@ -2,6 +2,7 @@ import os
 import secrets
 
 from cryptography.fernet import Fernet
+from dotenv import dotenv_values
 
 # Test configuration must be in place before the app (and its cached settings) import.
 os.environ.setdefault("APP_ENV", "test")
@@ -12,9 +13,16 @@ os.environ.setdefault("EMAIL_HMAC_KEY", secrets.token_urlsafe(48))
 # Tests sign up many accounts from one address; the limiter has its own tests that switch it on.
 os.environ.setdefault("RATE_LIMITS_ENABLED", "false")
 os.environ.setdefault("INVITE_CODES", "test-invite")
-# TEST_DATABASE_URL wins over DATABASE_URL, so a shell set up for the dev server can still run tests.
-os.environ["DATABASE_URL"] = os.environ.get("TEST_DATABASE_URL") or os.environ.get(
-    "DATABASE_URL", "postgresql+pg8000://onboarding:localdev@localhost:5432/onboarding_test"
+# TEST_DATABASE_URL (from the environment, then the repo-root .env) wins over DATABASE_URL, so a
+# shell or .env set up for the dev server still runs tests against the test database.
+_dotenv = {
+    **dotenv_values(os.path.join(os.path.dirname(__file__), "..", "..", ".env")),
+    **dotenv_values(os.path.join(os.path.dirname(__file__), "..", ".env")),
+}
+os.environ["DATABASE_URL"] = (
+    os.environ.get("TEST_DATABASE_URL")
+    or _dotenv.get("TEST_DATABASE_URL")
+    or os.environ.get("DATABASE_URL", "postgresql+pg8000://onboarding:localdev@localhost:5432/onboarding_test")
 )
 # The suite drops and recreates every table, so refuse any database not named for tests.
 if not os.environ["DATABASE_URL"].split("?")[0].rsplit("/", 1)[-1].endswith("_test"):
