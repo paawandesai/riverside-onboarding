@@ -114,7 +114,9 @@
             "type": "integer"
           }
         },
-        "required": ["slot_id"],
+        "required": [
+          "slot_id"
+        ],
         "title": "BookIn",
         "type": "object"
       },
@@ -136,7 +138,12 @@
             "type": "string"
           }
         },
-        "required": ["id", "status", "confirmation_code", "slot"],
+        "required": [
+          "id",
+          "status",
+          "confirmation_code",
+          "slot"
+        ],
         "title": "BookingOut",
         "type": "object"
       },
@@ -178,7 +185,11 @@
           "visit_type_preference": {
             "anyOf": [
               {
-                "enum": ["in_person", "telehealth", "no_preference"],
+                "enum": [
+                  "in_person",
+                  "telehealth",
+                  "no_preference"
+                ],
                 "type": "string"
               },
               {
@@ -203,7 +214,9 @@
             "type": "array"
           }
         },
-        "required": ["messages"],
+        "required": [
+          "messages"
+        ],
         "title": "ChatIn",
         "type": "object"
       },
@@ -221,7 +234,10 @@
             "type": "string"
           },
           "mode": {
-            "enum": ["ai", "fallback"],
+            "enum": [
+              "ai",
+              "fallback"
+            ],
             "title": "Mode",
             "type": "string"
           },
@@ -266,7 +282,17 @@
             "title": "Ui Action"
           }
         },
-        "required": ["mode", "intent", "reply", "fields", "support", "ui_action", "notice", "disclosure", "reply_sig"],
+        "required": [
+          "mode",
+          "intent",
+          "reply",
+          "fields",
+          "support",
+          "ui_action",
+          "notice",
+          "disclosure",
+          "reply_sig"
+        ],
         "title": "ChatOut",
         "type": "object"
       },
@@ -295,7 +321,10 @@
             "title": "Sig"
           }
         },
-        "required": ["role", "content"],
+        "required": [
+          "role",
+          "content"
+        ],
         "title": "ChatTurn",
         "type": "object"
       },
@@ -313,7 +342,10 @@
             "type": "string"
           }
         },
-        "required": ["detail", "alternatives"],
+        "required": [
+          "detail",
+          "alternatives"
+        ],
         "title": "ConflictOut",
         "type": "object"
       },
@@ -351,7 +383,10 @@
             "title": "Version"
           }
         },
-        "required": ["active", "version"],
+        "required": [
+          "active",
+          "version"
+        ],
         "title": "ConsentOut",
         "type": "object"
       },
@@ -384,7 +419,13 @@
             "type": "string"
           }
         },
-        "required": ["version", "summary", "points", "photo_scan", "details"],
+        "required": [
+          "version",
+          "summary",
+          "points",
+          "photo_scan",
+          "details"
+        ],
         "title": "ConsentTextOut",
         "type": "object"
       },
@@ -406,7 +447,11 @@
             "type": "string"
           }
         },
-        "required": ["anon_session_id", "step_id", "event"],
+        "required": [
+          "anon_session_id",
+          "step_id",
+          "event"
+        ],
         "title": "EventIn",
         "type": "object"
       },
@@ -443,7 +488,12 @@
             "type": "array"
           }
         },
-        "required": ["fields", "needs_review", "missing", "message"],
+        "required": [
+          "fields",
+          "needs_review",
+          "missing",
+          "message"
+        ],
         "title": "ExtractOut",
         "type": "object"
       },
@@ -461,7 +511,11 @@
             "title": "Confidence"
           },
           "status": {
-            "enum": ["found", "low_confidence", "missing"],
+            "enum": [
+              "found",
+              "low_confidence",
+              "missing"
+            ],
             "title": "Status",
             "type": "string"
           },
@@ -477,7 +531,11 @@
             "title": "Value"
           }
         },
-        "required": ["value", "confidence", "status"],
+        "required": [
+          "value",
+          "confidence",
+          "status"
+        ],
         "title": "ExtractedField",
         "type": "object"
       },
@@ -521,7 +579,11 @@
             "type": "object"
           }
         },
-        "required": ["full_name", "dob", "address"],
+        "required": [
+          "full_name",
+          "dob",
+          "address"
+        ],
         "title": "IdentityIn",
         "type": "object"
       },
@@ -624,7 +686,10 @@
             "type": "string"
           }
         },
-        "required": ["email", "password"],
+        "required": [
+          "email",
+          "password"
+        ],
         "title": "LoginIn",
         "type": "object"
       },
@@ -639,7 +704,10 @@
             "type": "string"
           }
         },
-        "required": ["id", "role"],
+        "required": [
+          "id",
+          "role"
+        ],
         "title": "MeOut",
         "type": "object"
       },
@@ -666,7 +734,13 @@
             "type": "boolean"
           }
         },
-        "required": ["consent", "photo_scan", "assessment_done", "identity_done", "booked"],
+        "required": [
+          "consent",
+          "photo_scan",
+          "assessment_done",
+          "identity_done",
+          "booked"
+        ],
         "title": "ProgressOut",
         "type": "object"
       },
@@ -703,7 +777,14 @@
             "$ref": "#/components/schemas/SlotOut"
           }
         },
-        "required": ["patient_id", "full_name", "confirmation_code", "slot", "identity_confirmed", "assessment_confirmed"],
+        "required": [
+          "patient_id",
+          "full_name",
+          "confirmation_code",
+          "slot",
+          "identity_confirmed",
+          "assessment_confirmed"
+        ],
         "title": "ScheduleItemOut",
         "type": "object"
       },
@@ -771,7 +852,12 @@
             "type": "string"
           }
         },
-        "required": ["email", "password", "invite_code", "adult_attestation"],
+        "required": [
+          "email",
+          "password",
+          "invite_code",
+          "adult_attestation"
+        ],
         "title": "SignupIn",
         "type": "object"
       },
@@ -799,7 +885,13 @@
             "type": "string"
           }
         },
-        "required": ["id", "starts_at", "duration_minutes", "visit_type", "clinician_label"],
+        "required": [
+          "id",
+          "starts_at",
+          "duration_minutes",
+          "visit_type",
+          "clinician_label"
+        ],
         "title": "SlotOut",
         "type": "object"
       },
@@ -860,7 +952,11 @@
           },
           "field_sources": {
             "additionalProperties": {
-              "enum": ["ocr_confirmed", "ocr_edited", "manual"],
+              "enum": [
+                "ocr_confirmed",
+                "ocr_edited",
+                "manual"
+              ],
               "type": "string"
             },
             "title": "Field Sources",
@@ -882,7 +978,16 @@
             "type": "string"
           }
         },
-        "required": ["patient_id", "full_name", "dob", "address", "field_sources", "assessment", "assessment_summary", "booking"],
+        "required": [
+          "patient_id",
+          "full_name",
+          "dob",
+          "address",
+          "field_sources",
+          "assessment",
+          "assessment_summary",
+          "booking"
+        ],
         "title": "StaffIntakeOut",
         "type": "object"
       },
@@ -907,7 +1012,10 @@
             "type": "string"
           }
         },
-        "required": ["id", "label"],
+        "required": [
+          "id",
+          "label"
+        ],
         "title": "SupportActionOut",
         "type": "object"
       },
@@ -937,7 +1045,13 @@
             "type": "boolean"
           }
         },
-        "required": ["trigger", "title", "body", "actions", "urgent"],
+        "required": [
+          "trigger",
+          "title",
+          "body",
+          "actions",
+          "urgent"
+        ],
         "title": "SupportCardOut",
         "type": "object"
       },
@@ -954,7 +1068,9 @@
             ]
           }
         },
-        "required": ["content"],
+        "required": [
+          "content"
+        ],
         "title": "SupportOut",
         "type": "object"
       },
@@ -990,7 +1106,11 @@
             "type": "string"
           }
         },
-        "required": ["loc", "msg", "type"],
+        "required": [
+          "loc",
+          "msg",
+          "type"
+        ],
         "title": "ValidationError",
         "type": "object"
       }
@@ -1038,7 +1158,9 @@
           }
         },
         "summary": "Login",
-        "tags": ["auth"]
+        "tags": [
+          "auth"
+        ]
       }
     },
     "/api/auth/logout": {
@@ -1051,7 +1173,9 @@
           }
         },
         "summary": "Logout",
-        "tags": ["auth"]
+        "tags": [
+          "auth"
+        ]
       }
     },
     "/api/auth/me": {
@@ -1070,7 +1194,9 @@
           }
         },
         "summary": "Me",
-        "tags": ["auth"]
+        "tags": [
+          "auth"
+        ]
       }
     },
     "/api/auth/signup": {
@@ -1109,7 +1235,9 @@
           }
         },
         "summary": "Signup",
-        "tags": ["auth"]
+        "tags": [
+          "auth"
+        ]
       }
     },
     "/api/bookings": {
@@ -1158,7 +1286,9 @@
           }
         },
         "summary": "Create Booking",
-        "tags": ["scheduling"]
+        "tags": [
+          "scheduling"
+        ]
       }
     },
     "/api/bookings/mine": {
@@ -1181,7 +1311,9 @@
           }
         },
         "summary": "My Bookings",
-        "tags": ["scheduling"]
+        "tags": [
+          "scheduling"
+        ]
       }
     },
     "/api/bookings/{booking_id}/cancel": {
@@ -1214,7 +1346,9 @@
           }
         },
         "summary": "Cancel Booking",
-        "tags": ["scheduling"]
+        "tags": [
+          "scheduling"
+        ]
       }
     },
     "/api/chat": {
@@ -1254,7 +1388,9 @@
           }
         },
         "summary": "Chat Turn",
-        "tags": ["assistant"]
+        "tags": [
+          "assistant"
+        ]
       }
     },
     "/api/consent": {
@@ -1273,7 +1409,9 @@
           }
         },
         "summary": "Consent Status",
-        "tags": ["privacy"]
+        "tags": [
+          "privacy"
+        ]
       },
       "post": {
         "description": "Grant consent from the consent notice (or re-confirm it with a different photo choice).",
@@ -1318,7 +1456,9 @@
           }
         },
         "summary": "Grant Consent",
-        "tags": ["privacy"]
+        "tags": [
+          "privacy"
+        ]
       }
     },
     "/api/consent/photo": {
@@ -1361,7 +1501,9 @@
           }
         },
         "summary": "Set Photo Consent",
-        "tags": ["privacy"]
+        "tags": [
+          "privacy"
+        ]
       }
     },
     "/api/consent/revoke": {
@@ -1381,7 +1523,9 @@
           }
         },
         "summary": "Revoke Consent",
-        "tags": ["privacy"]
+        "tags": [
+          "privacy"
+        ]
       }
     },
     "/api/consent/text": {
@@ -1400,7 +1544,9 @@
           }
         },
         "summary": "Consent Text",
-        "tags": ["privacy"]
+        "tags": [
+          "privacy"
+        ]
       }
     },
     "/api/documents/extract": {
@@ -1417,7 +1563,9 @@
                     "type": "string"
                   }
                 },
-                "required": ["file"],
+                "required": [
+                  "file"
+                ],
                 "type": "object"
               }
             }
@@ -1437,7 +1585,9 @@
           }
         },
         "summary": "Extract Document",
-        "tags": ["intake"]
+        "tags": [
+          "intake"
+        ]
       }
     },
     "/api/events": {
@@ -1470,7 +1620,9 @@
           }
         },
         "summary": "Record Event",
-        "tags": ["assistant"]
+        "tags": [
+          "assistant"
+        ]
       }
     },
     "/api/health": {
@@ -1492,7 +1644,9 @@
           }
         },
         "summary": "Health",
-        "tags": ["system"]
+        "tags": [
+          "system"
+        ]
       }
     },
     "/api/intake": {
@@ -1511,7 +1665,9 @@
           }
         },
         "summary": "Get Intake",
-        "tags": ["intake"]
+        "tags": [
+          "intake"
+        ]
       }
     },
     "/api/intake/assessment": {
@@ -1550,7 +1706,9 @@
           }
         },
         "summary": "Save Assessment",
-        "tags": ["intake"]
+        "tags": [
+          "intake"
+        ]
       }
     },
     "/api/intake/identity": {
@@ -1589,7 +1747,9 @@
           }
         },
         "summary": "Save Identity",
-        "tags": ["intake"]
+        "tags": [
+          "intake"
+        ]
       }
     },
     "/api/me": {
@@ -1601,7 +1761,9 @@
           }
         },
         "summary": "Delete Me",
-        "tags": ["privacy"]
+        "tags": [
+          "privacy"
+        ]
       }
     },
     "/api/me/data": {
@@ -1613,7 +1775,9 @@
           }
         },
         "summary": "Delete My Data",
-        "tags": ["privacy"]
+        "tags": [
+          "privacy"
+        ]
       }
     },
     "/api/progress": {
@@ -1633,7 +1797,9 @@
           }
         },
         "summary": "Progress",
-        "tags": ["intake"]
+        "tags": [
+          "intake"
+        ]
       }
     },
     "/api/slots": {
@@ -1685,7 +1851,9 @@
           }
         },
         "summary": "List Slots",
-        "tags": ["scheduling"]
+        "tags": [
+          "scheduling"
+        ]
       }
     },
     "/api/staff/intakes/{user_id}": {
@@ -1726,7 +1894,9 @@
           }
         },
         "summary": "Intake",
-        "tags": ["staff"]
+        "tags": [
+          "staff"
+        ]
       }
     },
     "/api/staff/schedule": {
@@ -1750,7 +1920,9 @@
           }
         },
         "summary": "Schedule",
-        "tags": ["staff"]
+        "tags": [
+          "staff"
+        ]
       }
     },
     "/api/support/evaluate": {
@@ -1790,7 +1962,9 @@
           }
         },
         "summary": "Evaluate Support",
-        "tags": ["assistant"]
+        "tags": [
+          "assistant"
+        ]
       }
     }
   }

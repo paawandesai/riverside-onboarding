@@ -9,7 +9,9 @@ locals {
   vault_secrets = {
     for s in [
       azurerm_key_vault_secret.database_url,
+      azurerm_key_vault_secret.migration_database_url,
       azurerm_key_vault_secret.session_secret,
+      azurerm_key_vault_secret.email_hmac_key,
       azurerm_key_vault_secret.field_encryption_key,
       azurerm_key_vault_secret.invite_codes,
       azurerm_key_vault_secret.demo_user_password,
@@ -26,7 +28,13 @@ locals {
     DATABASE_URL         = azurerm_key_vault_secret.database_url.name
     SESSION_SECRET       = azurerm_key_vault_secret.session_secret.name
     FIELD_ENCRYPTION_KEY = azurerm_key_vault_secret.field_encryption_key.name
+    EMAIL_HMAC_KEY       = azurerm_key_vault_secret.email_hmac_key.name
   }
+  # The migration init container connects as the admin and sets up the app's row-only role.
+  migrate_secret_env = merge(local.job_secret_env, {
+    DATABASE_URL     = azurerm_key_vault_secret.migration_database_url.name
+    APP_DATABASE_URL = azurerm_key_vault_secret.database_url.name
+  })
   secret_env = merge(
     local.job_secret_env,
     {
@@ -37,7 +45,13 @@ locals {
   )
 
   plain_env = {
-    APP_ENV                   = "production"
+    APP_ENV = "production"
+    # Key Vault references are versionless and read when a revision starts, so a rotation only takes
+    # effect in a new revision; changing this value is what creates one.
+    CREDENTIALS_VERSION       = tostring(var.credentials_version)
+    RUN_MIGRATIONS            = "false"
+    FORWARDED_IP_HOPS         = "1"
+    CLINIC_TIMEZONE           = "America/New_York"
     DEMO_MODE                 = "true"
     DEMO_RETENTION_HOURS      = tostring(var.demo_retention_hours)
     DEMO_USER_EMAIL           = var.demo_user_email
@@ -89,6 +103,30 @@ resource "azurerm_container_app" "app" {
   template {
     min_replicas = var.min_replicas
     max_replicas = 2
+
+    # Runs before every replica starts: migrations and the app role, as the database admin.
+    init_container {
+      name    = "migrate"
+      image   = local.image
+      cpu     = 0.25
+      memory  = "0.5Gi"
+      command = ["sh", "-c", "alembic upgrade head && python -m scripts.ensure_app_role"]
+
+      dynamic "env" {
+        for_each = { for k, v in local.plain_env : k => v if startswith(k, "APP_") || startswith(k, "DATABASE_") || startswith(k, "CREDENTIALS_") }
+        content {
+          name  = env.key
+          value = env.value
+        }
+      }
+      dynamic "env" {
+        for_each = local.migrate_secret_env
+        content {
+          name        = env.key
+          secret_name = env.value
+        }
+      }
+    }
 
     container {
       name   = "app"
@@ -174,7 +212,7 @@ resource "azurerm_container_app_job" "purge" {
       command = ["python", "-m", "scripts.purge_demo_data"]
 
       dynamic "env" {
-        for_each = { for k, v in local.plain_env : k => v if startswith(k, "APP_") || startswith(k, "DEMO_") || startswith(k, "DATABASE_") }
+        for_each = { for k, v in local.plain_env : k => v if startswith(k, "APP_") || startswith(k, "DEMO_") || startswith(k, "DATABASE_") || startswith(k, "CREDENTIALS_") || startswith(k, "CLINIC_") }
         content {
           name  = env.key
           value = env.value

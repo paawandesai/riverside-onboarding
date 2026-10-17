@@ -1,0 +1,30 @@
+{
+  "description": "Scripted multi-turn conversations (synthetic). After the last turn, the merged structured record must hold what the patient said and leave the rest empty: 'contains' means the field must include that text (case-insensitive), null means the field must stay empty, a bare string must match exactly, and an absent key isn't checked.",
+  "conversations": [
+    {
+      "id": "conv-01",
+      "turns": ["I'd like to come in about my knee", "It's been hurting for about two weeks", "A video visit would be easier for me"],
+      "expect": {"reason_for_visit": {"contains": "knee"}, "symptom_duration": {"contains": "two weeks"}, "visit_type_preference": "telehealth", "accessibility_needs": null}
+    },
+    {
+      "id": "conv-02",
+      "turns": ["I need a check-up", "I use a wheelchair, so I need step-free access", "In person is fine"],
+      "expect": {"reason_for_visit": {"contains": "check"}, "visit_type_preference": "in_person", "accessibility_needs": {"contains": "wheelchair"}}
+    },
+    {
+      "id": "conv-03",
+      "turns": ["There's a rash on my arm", "It started on Monday", "I don't mind whether it's in person or video"],
+      "expect": {"reason_for_visit": {"contains": "rash"}, "symptom_duration": {"contains": "monday"}, "visit_type_preference": "no_preference", "accessibility_needs": null}
+    },
+    {
+      "id": "conv-04",
+      "turns": ["Follow-up for my blood pressure", "That's all for now"],
+      "expect": {"reason_for_visit": {"contains": "blood pressure"}, "symptom_duration": null, "visit_type_preference": null, "accessibility_needs": null}
+    },
+    {
+      "id": "conv-05",
+      "turns": ["Hi, what are your hours?", "OK. I've had headaches for a month", "I'm hard of hearing, so an ASL interpreter would help"],
+      "expect": {"reason_for_visit": {"contains": "headache"}, "symptom_duration": {"contains": "month"}, "visit_type_preference": null, "accessibility_needs": {"contains": "interpreter"}}
+    }
+  ]
+}

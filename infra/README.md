@@ -6,11 +6,16 @@ Analytics for container logs, and an hourly Container Apps job that purges demo 
 
 ## Secrets never pass through Terraform
 
-- Generated secrets (DB password, session secret, field encryption key, invite code, demo
-  password) are Terraform **ephemeral** resources passed only to **write-only** arguments
+- Generated secrets (DB admin and app passwords, session secret, email lookup key, field
+  encryption key, invite code, demo password) are Terraform **ephemeral** resources passed only to **write-only** arguments
   (`administrator_password_wo`, `value_wo`). They are not in the plan, the state or outputs.
 - The Claude API key is written to Key Vault by `set_secret.py` from an environment variable.
 - The app reads secrets through Key Vault references resolved with its managed identity.
+- The app connects to Postgres as `onboarding_app`, a role that can only read and write rows. An
+  init container runs migrations as the admin and creates or updates that role (with a SCRAM
+  verifier, so the password never reaches the server in clear text) before each replica starts. The
+  admin URL is only given to that init container.
+- Key Vault access is logged (AuditEvent) to the Log Analytics workspace.
 - No `*.tfvars` file is needed; every variable has a non-secret default.
 
 ## One-time prerequisites
@@ -34,10 +39,31 @@ infra/deploy.sh -auto-approve
 The image tag is the current commit, so the working tree must be clean. Without
 `ANTHROPIC_RIVERSIDE_API_KEY` the app deploys with the rule-based assistant only.
 
+## Rotating credentials
+
+`infra/deploy.sh -auto-approve -var credentials_version=N` (one higher than the last value; the
+demo was last rotated to 2) issues a new demo password, invite code, session secret and both DB
+passwords. The app sets `CREDENTIALS_VERSION` from it, so the change rolls a new revision that
+reads the new values; the init container updates the app role's password and the seed step updates
+the demo user's password and signs out its sessions. Existing patient sessions end because the
+session secret changes. Between the first and last step of the deploy the old revision can't reach
+the database for a few minutes, because the admin password changes first.
+
+The email lookup key and the field encryption key are not rotated this way: changing them would
+make existing accounts unfindable or existing rows unreadable. `FIELD_ENCRYPTION_KEY` accepts a
+comma-separated list (new key first) for a planned rotation.
+
+To read the current demo values without printing them anywhere else (you need the Key Vault
+Secrets User role on the vault):
+
+```
+az keyvault secret show --vault-name <vault> --name demo-user-password --query value -o tsv
+az keyvault secret show --vault-name <vault> --name invite-codes --query value -o tsv
+```
+
 ## After grading
 
-- Rotate the demo login, invite code, session secret and DB password:
-  `infra/deploy.sh -var credentials_version=2`.
+- Rotate the demo login, invite code, session secret and DB passwords (see above).
 - Stop keeping an instance warm: `infra/deploy.sh -var min_replicas=0`.
 - Or remove everything: `terraform -chdir=infra/terraform destroy`.
 
@@ -46,9 +72,18 @@ The image tag is the current commit, so the working tree must be clean. Without
 - Postgres runs in `centralus` (`db_location`) while the app runs in the resource group's region:
   this subscription had no Flexible Server offers in `eastus`. Each query crosses regions (tens of ms).
 
-- No VNet: Postgres allows connections from Azure services (firewall rule `0.0.0.0`), protected
-  by TLS and a generated password. A production setup would use VNet integration and a
-  private endpoint, which the free account's consumption plan doesn't include.
+- No VNet: Postgres allows connections from Azure services in any tenant (firewall rule
+  `0.0.0.0`). Container Apps environments (including consumption-only ones) accept an
+  infrastructure subnet and Flexible Server supports a delegated private subnet, so this is a
+  choice, not a plan limit: adding them means recreating the environment and the server, which
+  wasn't worth it for synthetic data. Mitigations: TLS required and pinned to 1.2+, a row-only app
+  role, 40-character random passwords. A production setup would use the VNet and Entra ID
+  authentication with password login turned off.
+- Key Vault has soft delete (7 days) but not purge protection, so `terraform destroy` can remove
+  it completely; a production vault would turn purge protection on (it can't be turned off later).
+- The image is deployed by commit tag, not digest, and base images are pinned by tag.
+- The `tfstate` container is outside Terraform; turning on blob versioning and soft delete for it
+  is a one-off step in the storage account.
 - `min_replicas` defaults to 1 during grading: one 1 vCPU / 2 GiB instance stays up, billed at
   Azure's idle rate when not serving, which costs more than scale-to-zero (the free account's credit
   covers it). After grading, `infra/deploy.sh -var min_replicas=0` scales to zero again; the first

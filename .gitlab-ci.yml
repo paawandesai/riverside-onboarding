@@ -10,7 +10,26 @@ variables:
   PIP_CACHE_DIR: "$CI_PROJECT_DIR/.cache/pip"
   npm_config_cache: "$CI_PROJECT_DIR/.cache/npm"
 
+# Scheduled uptime checks (UPTIME_CHECK=1) run only the uptime job; every other job skips them.
+.skip_on_uptime: &skip_on_uptime
+  rules:
+    - if: '$UPTIME_CHECK == "1"'
+      when: never
+    - when: on_success
+
+uptime:
+  stage: scan
+  image: curlimages/curl:8.11.1
+  interruptible: false
+  rules:
+    - if: '$UPTIME_CHECK == "1"'
+  # /api/health makes no model call. The app runs with min_replicas=1, so this check measures
+  # availability without changing it (it is not a keep-alive). scripts/uptime_report.py sums results.
+  script:
+    - curl --fail --silent --show-error --max-time 15 -o /dev/null -w "%{http_code} in %{time_total}s\n" "$UPTIME_URL/api/health"
+
 secret-scan:
+  <<: *skip_on_uptime
   stage: scan
   image:
     name: zricethezav/gitleaks:v8.24.3
@@ -21,6 +40,7 @@ secret-scan:
     - gitleaks git --redact --no-banner --verbose .
 
 backend:
+  <<: *skip_on_uptime
   stage: test
   image: python:3.13-slim-bookworm
   services:
@@ -61,6 +81,7 @@ backend:
       coverage_report: { coverage_format: cobertura, path: backend/coverage.xml }
 
 frontend:
+  <<: *skip_on_uptime
   stage: test
   image: node:22-bookworm-slim
   cache:
@@ -77,6 +98,7 @@ frontend:
     - npm run build
 
 e2e:
+  <<: *skip_on_uptime
   stage: test
   # Browsers and Node come with the image (version matches @playwright/test); Python and Tesseract
   # are added for the real API, which serves the built frontend.
@@ -108,6 +130,7 @@ e2e:
     expire_in: 7 days
 
 licenses:
+  <<: *skip_on_uptime
   stage: test
   image: python:3.13-slim-bookworm
   cache:
@@ -120,6 +143,7 @@ licenses:
     - backend/.venv/bin/python scripts/license_audit.py --check
 
 terraform:
+  <<: *skip_on_uptime
   stage: test
   image:
     name: hashicorp/terraform:1.16.6
@@ -131,6 +155,7 @@ terraform:
     - terraform validate
 
 ocr-eval:
+  <<: *skip_on_uptime
   stage: test
   image: python:3.13-slim-bookworm
   cache:
@@ -146,12 +171,27 @@ ocr-eval:
     when: always
     paths: [eval/results/latest.json]
 
+dependency-audit:
+  <<: *skip_on_uptime
+  stage: test
+  image: python:3.13-slim-bookworm
+  # Checks shipped dependencies against public advisory databases (this sends the package list
+  # to PyPI/OSV and the npm registry). Fails on any known Python advisory and on critical npm ones.
+  script:
+    - pip install --quiet pip-audit==2.10.1
+    - pip-audit --requirement backend/requirements.lock --require-hashes --disable-pip
+    - apt-get update && apt-get install -y --no-install-recommends nodejs npm && rm -rf /var/lib/apt/lists/*
+    - cd frontend && npm audit --omit=dev --audit-level=critical
+
 docker-image:
   stage: build
   # Manual: the project runner is unprivileged and blocks user namespaces, so neither
   # Docker-in-Docker nor Buildah can build here (tried both). The same Dockerfile is built and
   # smoke-tested locally and by infra/deploy.sh. Run this job on a runner that allows it.
-  when: manual
+  rules:
+    - if: '$UPTIME_CHECK == "1"'
+      when: never
+    - when: manual
   allow_failure: true
   image: docker:27.5.1
   services: ["docker:27.5.1-dind"]

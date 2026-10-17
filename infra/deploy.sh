@@ -27,7 +27,9 @@ echo "== 1/4 registry, vault and generated secrets"
 $TF apply -input=false "$@" \
   -target=azurerm_role_assignment.deployer_acr_push \
   -target=azurerm_key_vault_secret.database_url \
+  -target=azurerm_key_vault_secret.migration_database_url \
   -target=azurerm_key_vault_secret.session_secret \
+  -target=azurerm_key_vault_secret.email_hmac_key \
   -target=azurerm_key_vault_secret.field_encryption_key \
   -target=azurerm_key_vault_secret.invite_codes \
   -target=azurerm_key_vault_secret.demo_user_password
@@ -41,6 +43,7 @@ build_args=()
 docker build "${build_args[@]}" -t "$ACR/onboarding:$TAG" "$ROOT"
 printf '%s' "$ARM_CLIENT_SECRET" | docker login "$ACR" --username "$ARM_CLIENT_ID" --password-stdin
 docker push "$ACR/onboarding:$TAG"
+docker logout "$ACR" >/dev/null # don't leave the service principal secret in ~/.docker/config.json
 
 echo "== 3/4 Claude API key"
 ANTHROPIC_IN_VAULT=false
