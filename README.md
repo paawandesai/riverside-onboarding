@@ -70,10 +70,10 @@ Specimen ID images for trying the upload step are in `fixtures/generated-ids/` (
 
 ## Measured results
 
-Measured on 2026-10-16 in a Linux x86_64 container with 4 CPUs and 15 GB RAM, Python 3.13,
+Measured on 2026-10-16 and 2026-10-17 in a Linux x86_64 container with 4 CPUs and 15 GB RAM, Python 3.13,
 Tesseract 5.3.4, Postgres 16 on the same machine. Re-run with `make eval` and `make load`.
 
-**Tests** (re-measured 2026-10-17). Backend: 82 tests, 94% line coverage (gate 80%). Frontend unit:
+**Tests** (re-measured 2026-10-17). Backend: 85 tests, 94% line coverage (gate 80%). Frontend unit:
 31 tests, 92.7% lines (gate 80%), each screen also checked with axe. End-to-end (Playwright, real API,
 real Postgres, real Tesseract, Pixel 7 viewport): 9 tests covering the ID-scan path, unreadable photo
 to typing, assistant failure to the form, two patients booking the same slot, consent withdrawal
@@ -82,45 +82,58 @@ AA with real CSS, no sideways scroll at 320 px, keyboard-only start, 200% text).
 
 **Frontend size.** Initial JavaScript is 128 KiB gzipped (budget 170 KiB); later steps load on demand.
 
-**OCR field accuracy** (name, DOB, address; 3 fields x 30 images per set):
+**OCR field accuracy** (name, DOB, address; 3 fields x 30 images per set; re-measured 2026-10-17):
 
 | Set | Accuracy | Clean | Phone photo | Skew/glare | Hard | p95 | Wrong value shown for review | Left blank |
 |---|---|---|---|---|---|---|---|---|
-| `generated-ids` (tuned against) | 91.1% | 100% | 93.3% | 90.5% | 55.6% | 1.49 s | 2 | 6 |
-| `generated-ids-holdout` (not tuned) | **88.9%** | 96.7% | 90.0% | 100% | 33.3% | 1.33 s | 2 | 8 |
+| `generated-ids` (tuned against) | 94.4% | 100% | 96.7% | 90.5% | 77.8% | 2.14 s | 2 | 3 |
+| `generated-ids-holdout` (not tuned, score seen before) | 92.2% | 96.7% | 93.3% | 100% | 55.6% | 2.15 s | 2 | 5 |
+| `generated-ids-holdout2` (made after the last change, never tuned on) | **91.1%** | 93.3% | 100% | 95.2% | 44.4% | 2.10 s | 2 | 6 |
 
-The parser was improved while looking at the first set, so the holdout number is the honest one,
-and it is **below the 90% target**. Most misses are left blank for the user rather than filled wrongly.
+The parser is tuned only against the first set. The first holdout was 88.9% before the latest
+change; its score was known while working, so `holdout2` was generated afterwards from a new seed
+and never tuned on, as the cleanest estimate. On that set the previous pipeline scored 87.8%. What changed:
+when a field is still missing after two passes, a third pass reads a view of the card that fades
+coloured stamps and evens out glare; misread labels such as "aporess" still count as ADDRESS; and an
+address with no state and ZIP is left blank instead of shown as a fragment. Most misses are left
+blank for the user rather than filled wrongly. The "hard" category (heavy blur, low contrast, small
+images; 3 cards per set) is still weak.
 
-**Load test** (k6, `k6/load.js`): 20 virtual users for 60 s on chat + slots + intake, with OCR
-uploads and bookings running concurrently. 0% failed requests.
+**Load test** (k6, `k6/load.js`, 2026-10-17): 20 virtual users for 60 s on chat + slots + intake,
+then OCR uploads and bookings. **Chat goes to Claude** (`claude-haiku-5-5`): 948 model calls, none
+fell back to the rules. 0 of 2,949 requests failed.
 
 | Metric | p95 | Target |
 |---|---|---|
-| API requests, 20 VUs | 84 ms | < 3 s |
-| Chat turn | 86 ms | < 3 s |
-| OCR upload | 985 ms | < 8 s |
-| Booking | 14.5 ms | < 1 s |
+| API requests, 20 VUs | 1.34 s | < 3 s |
+| Chat turn (Claude) | 1.51 s | < 3 s |
+| OCR upload | 977 ms | < 8 s |
+| Booking | 30.7 ms | < 1 s |
 
-The chat number is the **rule-based fallback only**; no API key was available for this run, so
-Claude latency has not been measured. The first run showed booking p95 at 1.78 s because the async
-OCR handler blocked the event loop; OCR now runs in a thread pool (commit "Run upload validation
-and OCR off the event loop").
+The API and model ran from the same cloud container (4 CPUs) against api.anthropic.com; the
+deployed app adds network distance and a cold start after idle. An earlier run showed booking p95
+at 1.78 s because the async OCR handler blocked the event loop; OCR now runs in a thread pool.
 
-**Intents** (`eval/intents.json`, 30 hand-written utterances, 6 per intent): rule-based fallback
-30/30. That set was also used to tune the fallback rules, so treat it as a regression check, not
-an accuracy estimate. Claude: **not measured yet** (needs the API key; `make eval` runs it when set).
+**Intents** (`eval/intents.json`, 30 hand-written utterances, 6 per intent): Claude **29/30**
+(96.7%), every intent handled. The miss: "Need a prescription refill for my blood pressure meds, in
+person is fine", labelled as giving visit details, which Claude called out of scope. Sequential
+p95 per call 1.8 s. Over two eval runs (60 calls) one call failed and fell back to the rules. The
+rule-based fallback scores 30/30, but that set was used to tune it, so treat it as a regression
+check, not an accuracy estimate. The prompt was not changed after seeing these results.
 
-**Adversarial** (`eval/adversarial/`): 7/7 prompt-injection cases pass on the fallback path.
-Injected text printed on an ID image comes back as a plain field value for the user to confirm and is
-never sent to a model. The Claude path for these cases has not been run yet.
+**Adversarial** (`eval/adversarial/`): 7/7 prompt-injection cases pass **on the Claude path** (no
+prompt leak, no links, no booking claims, valid intent and fields, distress override) and 7/7 on the
+fallback. Injected text printed on an ID image comes back as a plain field value for the user to
+confirm and is never sent to a model.
 
 ## Known constraints
 
-- OCR holdout accuracy is 88.9%, below the 90% target. The "hard" category (heavy blur, low
-  contrast) is the weak spot. A stronger OCR model was not added: several common choices are on the
-  project's banned list, and sending ID images to a vision model is not allowed here.
-- Claude intent accuracy, Claude latency and Claude adversarial results are not measured yet.
+- OCR clears 90% on both held-out sets (92.2% and 91.1%), but only by a small margin, and the
+  "hard" category (heavy blur, low contrast) is still weak at 44 to 56%. A stronger OCR model was
+  not added: several common choices are on the project's banned list, and sending ID images to a
+  vision model is not allowed here.
+- Claude results come from 30 intent cases and 7 injection cases: small sets, written by the same
+  agent that wrote the prompt.
 - The ID test sets are generated, not provided (see below), so they are cleaner than real photos.
 - The deployment uses a public Postgres endpoint restricted to Azure services (no VNet on the
   free account) and scales to zero, so the first request after idle is slow.
@@ -180,7 +193,8 @@ at startup and fails fast if it is unavailable.
 ## Synthetic data
 
 There were no sample ID images to work with, so `scripts/generate_specimen_ids.py` draws them:
-`fixtures/generated-ids/` (seed 20261016) and `fixtures/generated-ids-holdout/` (seed 7), 30 cards
+`fixtures/generated-ids/` (seed 20261016), `fixtures/generated-ids-holdout/` (seed 7) and
+`fixtures/generated-ids-holdout2/` (seed 20261017), 30 cards
 each in four categories, with `labels.json` ground truth. They are fictional "Maple Grove Community
 Health" member cards with a SPECIMEN watermark, a silhouette face, no real seals and no barcodes.
 No model was asked to produce them. `eval/intents.json` and the adversarial cases are hand-written.

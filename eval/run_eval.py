@@ -179,7 +179,9 @@ def main() -> None:
             "llm_model": settings.anthropic_model if use_llm else None,
             "llm_effort": settings.anthropic_effort if use_llm else None,
         },
-        "ocr": [eval_ocr(ROOT / "fixtures" / "generated-ids"), eval_ocr(ROOT / "fixtures" / "generated-ids-holdout")],
+        # generated-ids: tuned against. holdout: seen only as a score. holdout2: generated after the
+        # last OCR change and run once, so it is the cleanest estimate.
+        "ocr": [eval_ocr(ROOT / "fixtures" / f) for f in ("generated-ids", "generated-ids-holdout", "generated-ids-holdout2")],
         "intents": eval_intents(use_llm),
         "adversarial": {"chat": eval_adversarial_chat(use_llm), "ocr": eval_adversarial_ocr()},
     }

@@ -65,8 +65,8 @@ def test_normalize_dob_formats_and_refusals():
     assert ocr.normalize_dob("sometime in 1990") is None
 
 
-def _line(text, conf=95.0):
-    words, x = [], 0
+def _line(text, conf=95.0, x=0):
+    words = []
     for w in text.split():
         words.append(ocr._Word(w, conf, x))
         x += 20 * (len(w) + 1)
@@ -92,6 +92,30 @@ def test_unlabeled_date_fallback_ignores_issue_dates_and_minors():
     fields = ocr.parse_fields(lines)
     assert fields["dob"].value == "2001-05-05" and fields["dob"].status == "low_confidence"
     assert ocr.parse_fields([_line("ISSUED 2026-01-15")])["dob"].value is None
+
+
+def test_misread_address_label_still_counts():
+    # Tesseract often reads ADDRESS as "aporess"; the value and its continuation line still parse.
+    fields = ocr.parse_fields([_line("aporess 535 CEDAR HOLLOW DR"), _line("LAKEMERE MI 49565", x=160)])
+    assert fields["address"].value == "535 CEDAR HOLLOW DR, LAKEMERE MI 49565"
+    # An ordinary word is not mistaken for a label.
+    assert ocr.parse_fields([_line("progress 535 CEDAR HOLLOW DR LAKEMERE MI 49565")])["address"].value is None
+
+
+def test_truncated_address_is_left_blank_not_shown():
+    fields = ocr.parse_fields([_line("ADDRESS 9588 M/"), _line("BRAM")])
+    assert fields["address"].value is None and fields["address"].status == "missing"
+
+
+def test_glare_view_fades_coloured_stamp_and_evens_lighting():
+    card = Image.new("RGB", (800, 500), (240, 240, 240))
+    card.paste((230, 120, 120), (100, 100, 400, 200))  # pink stamp
+    card.paste((40, 40, 40), (500, 100, 520, 200))  # dark text stroke
+    flat = ocr.preprocess_flat(card).convert("L")
+    w, h = flat.size
+    stamp = flat.getpixel((int(w * 250 / 800), int(h * 150 / 500)))
+    stroke = flat.getpixel((int(w * 510 / 800), int(h * 150 / 500)))
+    assert stamp > 180 and stroke < 80
 
 
 def test_extracts_clean_golden_card():

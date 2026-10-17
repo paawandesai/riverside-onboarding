@@ -7,7 +7,7 @@
 // The chat path measured is whatever the server is configured for: check /api/health
 // ("llm.mode") and report it alongside the numbers. Nothing is stubbed.
 import http from "k6/http";
-import { check } from "k6";
+import { check, fail } from "k6";
 import { Trend } from "k6/metrics";
 
 const BASE = __ENV.BASE_URL || "http://localhost:8000";
@@ -46,7 +46,8 @@ function signup(i) {
     JSON.stringify({ email, password: RUN_PASSWORD, invite_code: INVITE, adult_attestation: true }),
     { headers: { ...CSRF, "Content-Type": "application/json" } },
   );
-  check(res, { "signup 201": (r) => r.status === 201 });
+  // Fail the run outright: thresholds over zero samples would otherwise "pass".
+  if (!check(res, { "signup 201": (r) => r.status === 201 })) fail(`signup returned ${res.status}`);
   const cookie = `onboarding_session=${res.cookies.onboarding_session[0].value}`;
   // Photo consent is separate and optional; load-test users agree so the OCR scenario can run.
   http.post(`${BASE}/api/consent`, JSON.stringify({ photo_scan: true }), {

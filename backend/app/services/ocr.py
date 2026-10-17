@@ -4,6 +4,8 @@ The pipeline is deliberately simple and deterministic:
   1. preprocess (grayscale, upscale, deskew by projection profile, contrast)
   2. Tesseract word-level OCR with confidences
   3. parse labeled fields (NAME / DOB / ADDRESS) into normalized values
+  4. only if something is still missing or uncertain: retry with another page-segmentation
+     mode, then on a glare- and stamp-suppressed image (see preprocess_flat)
 
 Each field reports found / missing / low_confidence. Nothing is guessed: a field we
 cannot read is returned as None so the user fills it in.
@@ -85,6 +87,28 @@ def preprocess(image: Image.Image) -> Image.Image:
     return gray.filter(ImageFilter.MedianFilter(3))
 
 
+def preprocess_flat(image: Image.Image) -> Image.Image:
+    """A second view of the card for glare and coloured stamps.
+
+    Printed text is dark in every colour channel, while a coloured stamp or watermark is bright
+    in at least one, so taking the brightest channel per pixel fades the stamp and keeps the text.
+    Dividing by a heavily blurred copy then removes uneven lighting (glare, shadow), so faint text
+    under a hotspot gets the same contrast as text elsewhere.
+    """
+    rgb = np.asarray(image.convert("RGB"), dtype=np.float32)
+    gray = Image.fromarray(rgb.max(axis=2).astype(np.uint8))
+    if gray.width < 1600:
+        scale = 1600 / gray.width
+        gray = gray.resize((int(gray.width * scale), int(gray.height * scale)), Image.Resampling.LANCZOS)
+    angle = _deskew_angle(gray)
+    if abs(angle) >= 0.5:
+        gray = gray.rotate(angle, resample=Image.Resampling.BICUBIC, expand=True, fillcolor=255)
+    arr = np.asarray(gray, dtype=np.float32)
+    background = np.asarray(gray.filter(ImageFilter.GaussianBlur(radius=max(gray.width // 40, 8))), dtype=np.float32)
+    flat = np.clip(arr / np.maximum(background, 1.0) * 255.0, 0, 255).astype(np.uint8)
+    return ImageOps.autocontrast(Image.fromarray(flat), cutoff=1)
+
+
 # ---------- OCR ----------
 
 
@@ -143,6 +167,36 @@ _ANY_LABEL = re.compile(
     r"(?:^|[^A-Za-z])(?:name|dob|date\s*of\s*birth|address|member|issued|expires|specimen)\b",
     re.I,
 )
+# Labels as OCR often misreads them ("aporess", "ADORESS"): the first word of a line within a small
+# edit distance of the label counts. Only labels of 4+ letters, where a 1-2 letter slip can't turn
+# one ordinary word into another; short labels like DOB rely on the exact pattern above.
+_FUZZY_LABELS = {"full_name": ("name", 1), "address": ("address", 2)}
+_FIRST_WORD = re.compile(r"^\W*([A-Za-z0-9]{3,9})\b[\s:.\-]*")
+
+
+def _edit_distance(a: str, b: str) -> int:
+    prev = list(range(len(b) + 1))
+    for i, ca in enumerate(a, 1):
+        cur = [i]
+        for j, cb in enumerate(b, 1):
+            cur.append(min(prev[j] + 1, cur[j - 1] + 1, prev[j - 1] + (ca != cb)))
+        prev = cur
+    return prev[-1]
+
+
+def _label_end(name: str, text: str) -> int | None:
+    """Where the value starts after this field's label on the line, or None if there's no label."""
+    match = _LABELS[name].search(text)
+    if match:
+        return match.end()
+    if name in _FUZZY_LABELS:
+        label, max_distance = _FUZZY_LABELS[name]
+        first = _FIRST_WORD.match(text)
+        if first and _edit_distance(first.group(1).lower(), label) <= max_distance:
+            return first.end()
+    return None
+
+
 _ID_NUMBER = re.compile(r"\b[A-Z]{1,4}-?\d{5,}\b")  # member / record numbers end an address block
 _ISSUED = re.compile(r"\b(?:issued|expires|exp|iss)\b", re.I)
 _DATE_SHAPE = re.compile(r"\d{1,4}[-/.]\d{1,2}[-/.]\d{2,4}|\d{1,2}\s+[A-Za-z]{3,9}\.?\s+\d{4}")
@@ -201,11 +255,18 @@ def normalize_name(raw: str) -> str | None:
     return cleaned.upper()
 
 
+_STATE_ZIP_END = re.compile(r"\b[A-Z]{2},? \d{5}(?:-\d{4})?$")
+
+
 def normalize_address(parts: list[str]) -> str | None:
     joined = ", ".join(p.strip(" ,") for p in parts if p.strip(" ,"))
     joined = re.sub(r"[^A-Za-z0-9#'.,\- ]", " ", joined)
     joined = re.sub(r"\s+", " ", joined).strip(" ,")
     if not re.search(r"\d", joined) or len(joined) < 8:
+        return None
+    # A US address ends in a state code and ZIP. Without them the read is truncated or garbled,
+    # so leave the field blank for the user (or a later pass) rather than show a fragment.
+    if not _STATE_ZIP_END.search(joined.upper()):
         return None
     return joined.upper()
 
@@ -223,13 +284,13 @@ def _value_start_x(line: _Line, char_offset: int) -> int | None:
 def parse_fields(lines: list[_Line]) -> dict[str, FieldResult]:
     results: dict[str, FieldResult] = {f: FieldResult(None, None, "missing") for f in FIELDS}
     for idx, line in enumerate(lines):
-        for name, pattern in _LABELS.items():
-            match = pattern.search(line.text)
-            if results[name].value or not match:
+        for name in _LABELS:
+            end = None if results[name].value else _label_end(name, line.text)
+            if end is None:
                 continue
-            remainder = line.text[match.end() :].strip()
+            remainder = line.text[end:].strip()
             confs = [line.confidence]
-            value_x = _value_start_x(line, match.end())
+            value_x = _value_start_x(line, end)
             # Value may sit on the line after its label.
             if not remainder and idx + 1 < len(lines) and not _ANY_LABEL.search(lines[idx + 1].text):
                 remainder = lines[idx + 1].text
@@ -279,10 +340,12 @@ def extract_fields(image: Image.Image) -> OcrResult:
     # Second pass with a different page-segmentation mode, only when the first pass
     # left something missing or uncertain. It fills gaps; it never overrides a
     # confident first-pass value.
-    if any(f.status != "found" for f in fields.values()):
-        second = parse_fields(_ocr_lines(prepared, psm=6))
-        notes.append("pass2:psm6")
-        for name, alt in second.items():
+    passes = [("pass2:psm6", lambda: _ocr_lines(prepared, psm=6)), ("pass3:flat", lambda: _ocr_lines(preprocess_flat(image), psm=4))]
+    for note, run in passes:
+        if all(f.status == "found" for f in fields.values()):
+            break
+        notes.append(note)
+        for name, alt in parse_fields(run()).items():
             cur = fields[name]
             if alt.value and (cur.value is None or (cur.status == "low_confidence" and (alt.confidence or 0) > (cur.confidence or 0))):
                 fields[name] = alt
