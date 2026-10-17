@@ -74,3 +74,9 @@ variable "tags" {
     data    = "synthetic-only"
   }
 }
+
+variable "key_vault_audit_logs" {
+  description = "Send Key Vault AuditEvent logs to Log Analytics. Register Microsoft.Insights on the subscription first."
+  type        = bool
+  default     = false
+}

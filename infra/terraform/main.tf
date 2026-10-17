@@ -48,8 +48,10 @@ resource "azurerm_key_vault" "kv" {
   tags                       = var.tags
 }
 
-# Who read or changed which secret, kept with the app's other logs (30 days).
+# Who read or changed which secret, kept with the app's other logs (30 days). Needs the
+# Microsoft.Insights provider registered on the subscription, which the deploy principal can't do.
 resource "azurerm_monitor_diagnostic_setting" "kv_audit" {
+  count                      = var.key_vault_audit_logs ? 1 : 0
   name                       = "kv-audit"
   target_resource_id         = azurerm_key_vault.kv.id
   log_analytics_workspace_id = azurerm_log_analytics_workspace.logs.id

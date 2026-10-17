@@ -15,7 +15,9 @@ Analytics for container logs, and an hourly Container Apps job that purges demo 
   init container runs migrations as the admin and creates or updates that role (with a SCRAM
   verifier, so the password never reaches the server in clear text) before each replica starts. The
   admin URL is only given to that init container.
-- Key Vault access is logged (AuditEvent) to the Log Analytics workspace.
+- Key Vault access can be logged (AuditEvent) to the Log Analytics workspace with
+  `-var key_vault_audit_logs=true`, once `Microsoft.Insights` is registered on the subscription
+  (prerequisite 3). It is off by default because it wasn't registered for the demo.
 - No `*.tfvars` file is needed; every variable has a non-secret default.
 
 ## One-time prerequisites
@@ -26,7 +28,8 @@ Analytics for container logs, and an hourly Container Apps job that purges demo 
    The backend uses the account key, which the principal can list through its RG role.
 3. Resource providers registered on the subscription (the RG-scoped principal can't do this):
    `Microsoft.App`, `Microsoft.ContainerRegistry`, `Microsoft.DBforPostgreSQL`,
-   `Microsoft.KeyVault`, `Microsoft.OperationalInsights`, `Microsoft.ManagedIdentity`.
+   `Microsoft.KeyVault`, `Microsoft.OperationalInsights`, `Microsoft.ManagedIdentity`, and
+   `Microsoft.Insights` if you turn on Key Vault audit logs.
    For example: `az provider register --namespace Microsoft.App` for each, as a subscription owner.
 
 ## Deploy
