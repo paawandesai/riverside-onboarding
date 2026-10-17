@@ -1,5 +1,6 @@
 import logging
 import uuid
+from typing import Literal
 
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
@@ -24,12 +25,31 @@ class ChatIn(BaseModel):
     messages: list[ChatTurn] = Field(min_length=1, max_length=60)
 
 
+class SupportCardOut(BaseModel):
+    trigger: str
+    title: str
+    body: str
+    actions: list[str]
+    urgent: bool
+
+
+class SupportOut(BaseModel):
+    content: SupportCardOut | None
+
+
+class ChatFieldsOut(BaseModel):
+    reason_for_visit: str | None = None
+    symptom_duration: str | None = None
+    visit_type_preference: Literal["in_person", "telehealth", "no_preference"] | None = None
+    accessibility_needs: str | None = None
+
+
 class ChatOut(BaseModel):
-    mode: str
+    mode: Literal["ai", "fallback"]
     intent: str
     reply: str
-    fields: dict
-    support: dict | None
+    fields: ChatFieldsOut
+    support: SupportCardOut | None
     ui_action: str | None
     notice: str | None
     disclosure: str
@@ -55,7 +75,7 @@ class SignalsIn(BaseModel):
     llm_unavailable: bool = False
 
 
-@router.post("/support/evaluate")
+@router.post("/support/evaluate", response_model=SupportOut)
 def evaluate_support(body: SignalsIn) -> dict:
     """Returns {"content": card} for the highest-priority active trigger, or {"content": null}."""
     content = support.content_for(support.Signals(**body.model_dump()))

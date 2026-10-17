@@ -20,7 +20,15 @@ class ConsentIn(BaseModel):
     photo_scan: bool = False
 
 
-@router.get("/consent/text")
+class ConsentTextOut(BaseModel):
+    version: str
+    summary: str
+    points: list[str]
+    photo_scan: str
+    details: list[str]
+
+
+@router.get("/consent/text", response_model=ConsentTextOut)
 def consent_text() -> dict:
     return CONSENT_TEXT
 

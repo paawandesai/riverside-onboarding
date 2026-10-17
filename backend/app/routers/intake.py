@@ -1,6 +1,7 @@
 import logging
 import re
 from datetime import UTC, date, datetime
+from typing import Literal
 
 from fastapi import APIRouter, Depends, File, HTTPException, Request, UploadFile
 from fastapi.concurrency import run_in_threadpool
@@ -48,7 +49,7 @@ def _record(db: Session, user_id: str) -> IntakeRecord:
 class ExtractedField(BaseModel):
     value: str | None
     confidence: float | None
-    status: str
+    status: Literal["found", "low_confidence", "missing"]
 
 
 class ExtractOut(BaseModel):
