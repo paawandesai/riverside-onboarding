@@ -48,7 +48,8 @@ function AccountForm({ signIn }: { signIn: boolean }) {
       if (signIn) await api.login({ email: v.email, password: v.password });
       else await api.signup({ email: v.email, password: v.password, invite_code: v.invite_code.trim(), adult_attestation: true });
       await queryClient.invalidateQueries({ queryKey: ["me"] });
-      navigate(signIn ? nextPath(await api.progress()) : "/consent");
+      const me = signIn ? await api.me() : null;
+      navigate(me?.role === "staff" ? "/staff" : signIn ? nextPath(await api.progress()) : "/consent");
     } catch (e) {
       setServerError(e instanceof ApiError ? e.message : t("error.generic"));
     }

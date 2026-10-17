@@ -247,3 +247,30 @@ details summary {
   top: 8px;
   right: 8px;
 }
+
+/* Staff */
+.staff-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: grid;
+  gap: 12px;
+}
+.staff-fields {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 4px 16px;
+  margin: 0;
+}
+.staff-fields dt {
+  font-weight: 700;
+}
+.staff-fields dd {
+  margin: 0 0 8px;
+  overflow-wrap: anywhere;
+}
+@media (min-width: 40rem) {
+  .staff-fields {
+    grid-template-columns: 12rem minmax(0, 1fr);
+  }
+}

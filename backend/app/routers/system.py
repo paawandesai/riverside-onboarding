@@ -1,13 +1,10 @@
-from fastapi import APIRouter, Depends, HTTPException
-from sqlalchemy import select, text
+from fastapi import APIRouter, Depends
+from sqlalchemy import text
 from sqlalchemy.orm import Session
 
 from app.config import get_settings
 from app.db import get_db
-from app.models import IntakeRecord, User
-from app.security import audit, decrypt_json, decrypt_str, require_staff
 from app.services import health_state, ocr
-from app.services.chat import assessment_summary
 
 router = APIRouter(prefix="/api", tags=["system"])
 
@@ -34,22 +31,4 @@ def health(db: Session = Depends(get_db)) -> dict:
             "mode": "ai_with_fallback" if settings.llm_enabled else "fallback_only",
             **health_state.snapshot("llm"),
         },
-    }
-
-
-@router.get("/staff/intakes/{user_id}")
-def staff_view_intake(user_id: str, staff: User = Depends(require_staff), db: Session = Depends(get_db)) -> dict:
-    """Role-scoped staff read; every access is audit-logged."""
-    record = db.scalar(select(IntakeRecord).where(IntakeRecord.user_id == user_id))
-    audit(db, "staff_viewed_intake", staff.id, user_id)
-    db.commit()
-    if record is None:
-        raise HTTPException(status_code=404, detail="No intake record.")
-    assessment = decrypt_json(record.assessment_enc)
-    return {
-        "full_name": decrypt_str(record.full_name_enc),
-        "dob": decrypt_str(record.dob_enc),
-        "address": decrypt_str(record.address_enc),
-        "field_sources": record.field_sources,
-        "assessment_summary": assessment_summary(assessment) if assessment else None,
     }

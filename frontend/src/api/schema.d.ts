@@ -391,10 +391,30 @@ export interface paths {
             cookie?: never;
         };
         /**
-         * Staff View Intake
-         * @description Role-scoped staff read; every access is audit-logged.
+         * Intake
+         * @description One patient's confirmed details and visit answers.
          */
-        get: operations["staff_view_intake_api_staff_intakes__user_id__get"];
+        get: operations["intake_api_staff_intakes__user_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/staff/schedule": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Schedule
+         * @description Upcoming booked visits, soonest first.
+         */
+        get: operations["schedule_api_staff_schedule_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -429,6 +449,17 @@ export interface components {
     schemas: {
         /** AssessmentIn */
         AssessmentIn: {
+            /** Accessibility Needs */
+            accessibility_needs?: string | null;
+            /** Reason For Visit */
+            reason_for_visit?: string | null;
+            /** Symptom Duration */
+            symptom_duration?: string | null;
+            /** Visit Type Preference */
+            visit_type_preference?: string | null;
+        };
+        /** AssessmentOut */
+        AssessmentOut: {
             /** Accessibility Needs */
             accessibility_needs?: string | null;
             /** Reason For Visit */
@@ -657,6 +688,20 @@ export interface components {
             /** Photo Scan */
             photo_scan: boolean;
         };
+        /** ScheduleItemOut */
+        ScheduleItemOut: {
+            /** Assessment Confirmed */
+            assessment_confirmed: boolean;
+            /** Confirmation Code */
+            confirmation_code: string;
+            /** Full Name */
+            full_name: string | null;
+            /** Identity Confirmed */
+            identity_confirmed: boolean;
+            /** Patient Id */
+            patient_id: string;
+            slot: components["schemas"]["SlotOut"];
+        };
         /** SignalsIn */
         SignalsIn: {
             /**
@@ -719,6 +764,25 @@ export interface components {
             starts_at: string;
             /** Visit Type */
             visit_type: string;
+        };
+        /** StaffIntakeOut */
+        StaffIntakeOut: {
+            /** Address */
+            address: string | null;
+            assessment: components["schemas"]["AssessmentOut"] | null;
+            /** Assessment Summary */
+            assessment_summary: string | null;
+            booking: components["schemas"]["ScheduleItemOut"] | null;
+            /** Dob */
+            dob: string | null;
+            /** Field Sources */
+            field_sources: {
+                [key: string]: "ocr_confirmed" | "ocr_edited" | "manual";
+            };
+            /** Full Name */
+            full_name: string | null;
+            /** Patient Id */
+            patient_id: string;
         };
         /** SupportCardOut */
         SupportCardOut: {
@@ -1339,7 +1403,7 @@ export interface operations {
             };
         };
     };
-    staff_view_intake_api_staff_intakes__user_id__get: {
+    intake_api_staff_intakes__user_id__get: {
         parameters: {
             query?: never;
             header?: never;
@@ -1356,9 +1420,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
+                    "application/json": components["schemas"]["StaffIntakeOut"];
                 };
             };
             /** @description Validation Error */
@@ -1368,6 +1430,26 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    schedule_api_staff_schedule_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ScheduleItemOut"][];
                 };
             };
         };

@@ -101,3 +101,31 @@ def test_staff_access_is_role_scoped_and_audited(user_client, db):
     r = staff.get(f"/api/staff/intakes/{patient_id}")
     assert r.status_code == 200 and r.json()["full_name"] == "AVERY TESTCASE"
     assert db.scalar(select(AuditLog).where(AuditLog.action == "staff_viewed_intake")).actor_user_id == staff_id
+
+
+def test_staff_schedule_lists_upcoming_visits_with_intake_and_is_audited(user_client, db, slots):
+    from app.models import User
+
+    user_client.put("/api/intake/identity", json=IDENTITY)
+    user_client.put("/api/intake/assessment", json={"reason_for_visit": "Knee pain", "visit_type_preference": "in_person"})
+    slot = user_client.get("/api/slots").json()[0]
+    assert user_client.post("/api/bookings", json={"slot_id": slot["id"]}).status_code == 201
+    patient_id = user_client.get("/api/auth/me").json()["id"]
+
+    # Patients can't see the schedule.
+    assert user_client.get("/api/staff/schedule").status_code == 403
+
+    staff = make_client("schedule-staff@example.com")
+    staff_id = staff.get("/api/auth/me").json()["id"]
+    db.get(User, staff_id).role = "staff"
+    db.commit()
+    items = staff.get("/api/staff/schedule").json()
+    assert [i["patient_id"] for i in items] == [patient_id]
+    assert items[0]["full_name"] == "AVERY TESTCASE" and items[0]["slot"]["id"] == slot["id"]
+    assert items[0]["identity_confirmed"] and items[0]["assessment_confirmed"]
+    assert db.scalar(select(AuditLog).where(AuditLog.action == "staff_listed_schedule")).actor_user_id == staff_id
+
+    detail = staff.get(f"/api/staff/intakes/{patient_id}").json()
+    assert detail["assessment"]["reason_for_visit"] == "Knee pain"
+    assert detail["assessment_summary"].startswith("Non-binding intake summary")
+    assert detail["booking"]["confirmation_code"] == items[0]["confirmation_code"]

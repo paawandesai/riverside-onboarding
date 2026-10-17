@@ -9,10 +9,11 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
+from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from app.config import get_settings
 from app.logging_config import configure_logging, log_event
-from app.routers import assistant, auth, intake, privacy, scheduling, system
+from app.routers import assistant, auth, intake, privacy, scheduling, staff, system
 from app.services import llm
 
 logger = logging.getLogger("app")
@@ -32,6 +33,21 @@ CSP = (
     "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' blob: data:; font-src 'self'; "
     "connect-src 'self'; object-src 'none'; base-uri 'none'; form-action 'self'; frame-ancestors 'none'"
 )
+
+
+class SpaStaticFiles(StaticFiles):
+    """Serve the SPA's index.html for client-side routes, so reloading /book or a shared link works.
+
+    Real files (assets) are served as usual; unknown API paths and missing assets still 404.
+    """
+
+    async def get_response(self, path: str, scope):
+        try:
+            return await super().get_response(path, scope)
+        except StarletteHTTPException as exc:
+            if exc.status_code != 404 or path.startswith("api/") or "." in path.rsplit("/", 1)[-1]:
+                raise
+            return await super().get_response("index.html", scope)
 
 
 def create_app() -> FastAPI:
@@ -104,11 +120,11 @@ def create_app() -> FastAPI:
         ]
         return JSONResponse(status_code=422, content={"detail": "Please check the highlighted fields.", "errors": errors})
 
-    for router in (auth.router, privacy.router, intake.router, assistant.router, scheduling.router, system.router):
+    for router in (auth.router, privacy.router, intake.router, assistant.router, scheduling.router, staff.router, system.router):
         app.include_router(router)
     # In the container the built frontend is served from the same origin (no CORS needed).
     if os.path.isdir(settings.static_dir):
-        app.mount("/", StaticFiles(directory=settings.static_dir, html=True), name="frontend")
+        app.mount("/", SpaStaticFiles(directory=settings.static_dir, html=True), name="frontend")
     return app
 
 

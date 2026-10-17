@@ -10,8 +10,8 @@ if [ -n "$mentions" ]; then
   echo "$mentions" >&2
 fi
 values=$(echo "$added" | grep -E 'sk-ant-[A-Za-z0-9_-]{10,}|Bearer [A-Za-z0-9._-]{20,}|(KEY|SECRET|TOKEN|PASSWORD)[A-Z_]*\s*[:=]\s*["'"'"']?[A-Za-z0-9+/_.=-]{20,}' || true)
-# Not values: references to other config (Terraform locals/vars/resources) and kebab-case secret names.
-values=$(echo "$values" | grep -vE '[:=]\s*(local|var|data|module|ephemeral|azurerm_[a-z_]+)\.[a-z_.]+\s*[,})]*\s*(:|$)|[:=]\s*"[a-z]+(-[a-z]+)+"\s*,?\s*$' || true)
+# Not values: references to other config (Terraform locals/vars/resources, process.env) and kebab-case secret names.
+values=$(echo "$values" | grep -vE '[:=]\s*(local|var|data|module|ephemeral|azurerm_[a-z_]+)\.[a-z_.]+\s*[,})]*\s*(:|$)|[:=]\s*process\.env\.[A-Z0-9_]+\s*,?\s*$|[:=]\s*"[a-z]+(-[a-z]+)+"\s*,?\s*$' || true)
 if [ -n "$values" ]; then
   echo "Blocked: these lines look like real secret values:" >&2
   echo "$values" >&2

@@ -16,6 +16,10 @@ const ConfirmDetails = lazy(() => import("../steps/ConfirmDetails").then((m) => 
 const Book = lazy(() => import("../steps/Book"));
 const Done = lazy(() => import("../steps/Done").then((m) => ({ default: m.Done })));
 const Privacy = lazy(() => import("../steps/Privacy").then((m) => ({ default: m.Privacy })));
+const StaffPages = () => import("../steps/Staff");
+const RequireStaff = lazy(() => StaffPages().then((m) => ({ default: m.RequireStaff })));
+const StaffSchedule = lazy(() => StaffPages().then((m) => ({ default: m.StaffSchedule })));
+const StaffIntake = lazy(() => StaffPages().then((m) => ({ default: m.StaffIntake })));
 const later = (node: ReactNode) => <Suspense fallback={<p aria-live="polite">{t("common.loading")}</p>}>{node}</Suspense>;
 
 export const routes = [
@@ -38,6 +42,13 @@ export const routes = [
           { path: "/book", element: later(<Book />) },
           { path: "/done", element: later(<Done />) },
           { path: "/privacy", element: later(<Privacy />) },
+        ],
+      },
+      {
+        element: later(<RequireStaff />),
+        children: [
+          { path: "/staff", element: later(<StaffSchedule />) },
+          { path: "/staff/patients/:patientId", element: later(<StaffIntake />) },
         ],
       },
       { path: "*", element: <ErrorPage notFound /> },

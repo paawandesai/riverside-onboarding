@@ -1,5 +1,5 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { CircleHelp, Type, UserRound, WifiOff } from "lucide-react";
+import { CalendarDays, CircleHelp, Type, UserRound, WifiOff } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Link, Outlet, useNavigate } from "react-router";
 import { api } from "../api";
@@ -103,7 +103,12 @@ function Shell() {
           <button type="button" className="btn btn--link" aria-pressed={large} onClick={() => setLarge((v) => !v)}>
             <Type aria-hidden="true" size={20} /> {t("header.textSize")}
           </button>
-          {signedIn && (
+          {signedIn && me.data.role === "staff" && (
+            <Link to="/staff" className="btn btn--link">
+              <CalendarDays aria-hidden="true" size={20} /> {t("header.schedule")}
+            </Link>
+          )}
+          {signedIn && me.data.role !== "staff" && (
             <>
               <Link to="/privacy" className="btn btn--link">
                 <UserRound aria-hidden="true" size={20} /> {t("header.privacy")}

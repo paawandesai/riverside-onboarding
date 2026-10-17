@@ -40,8 +40,8 @@ export async function chatAndContinue(page: Page, message = "I've had headaches 
   await expect(page).toHaveURL(/\/details$/);
 }
 
-export async function typeDetails(page: Page) {
-  await page.getByLabel("Full legal name").fill("Avery Quinn");
+export async function typeDetails(page: Page, name = "Avery Quinn") {
+  await page.getByLabel("Full legal name").fill(name);
   await page.getByLabel("Month").fill("4");
   await page.getByLabel("Day").fill("12");
   await page.getByLabel("Year").fill("1985");

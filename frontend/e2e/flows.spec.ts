@@ -110,3 +110,11 @@ test("security headers are set and the page works under the CSP", async ({ page 
   await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
   expect(errors.filter((e) => /Content Security Policy/i.test(e))).toEqual([]);
 });
+
+test("opening or reloading a deep link loads the app instead of a 404", async ({ page }) => {
+  await page.goto("/privacy");
+  await expect(page.getByRole("heading", { name: "Sign in" })).toBeVisible();
+  await signUp(page);
+  await page.reload();
+  await expect(page.getByRole("log")).toBeVisible();
+});

@@ -55,6 +55,56 @@
         "title": "AssessmentIn",
         "type": "object"
       },
+      "AssessmentOut": {
+        "properties": {
+          "accessibility_needs": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Accessibility Needs"
+          },
+          "reason_for_visit": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason For Visit"
+          },
+          "symptom_duration": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Symptom Duration"
+          },
+          "visit_type_preference": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Visit Type Preference"
+          }
+        },
+        "title": "AssessmentOut",
+        "type": "object"
+      },
       "Body_extract_document_api_documents_extract_post": {
         "properties": {
           "file": {
@@ -689,6 +739,50 @@
         "title": "ProgressOut",
         "type": "object"
       },
+      "ScheduleItemOut": {
+        "properties": {
+          "assessment_confirmed": {
+            "title": "Assessment Confirmed",
+            "type": "boolean"
+          },
+          "confirmation_code": {
+            "title": "Confirmation Code",
+            "type": "string"
+          },
+          "full_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Full Name"
+          },
+          "identity_confirmed": {
+            "title": "Identity Confirmed",
+            "type": "boolean"
+          },
+          "patient_id": {
+            "title": "Patient Id",
+            "type": "string"
+          },
+          "slot": {
+            "$ref": "#/components/schemas/SlotOut"
+          }
+        },
+        "required": [
+          "patient_id",
+          "full_name",
+          "confirmation_code",
+          "slot",
+          "identity_confirmed",
+          "assessment_confirmed"
+        ],
+        "title": "ScheduleItemOut",
+        "type": "object"
+      },
       "SignalsIn": {
         "properties": {
           "booking_conflicts": {
@@ -794,6 +888,102 @@
           "clinician_label"
         ],
         "title": "SlotOut",
+        "type": "object"
+      },
+      "StaffIntakeOut": {
+        "properties": {
+          "address": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Address"
+          },
+          "assessment": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AssessmentOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "assessment_summary": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Assessment Summary"
+          },
+          "booking": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ScheduleItemOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "dob": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Dob"
+          },
+          "field_sources": {
+            "additionalProperties": {
+              "enum": [
+                "ocr_confirmed",
+                "ocr_edited",
+                "manual"
+              ],
+              "type": "string"
+            },
+            "title": "Field Sources",
+            "type": "object"
+          },
+          "full_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Full Name"
+          },
+          "patient_id": {
+            "title": "Patient Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "patient_id",
+          "full_name",
+          "dob",
+          "address",
+          "field_sources",
+          "assessment",
+          "assessment_summary",
+          "booking"
+        ],
+        "title": "StaffIntakeOut",
         "type": "object"
       },
       "SupportCardOut": {
@@ -1590,8 +1780,8 @@
     },
     "/api/staff/intakes/{user_id}": {
       "get": {
-        "description": "Role-scoped staff read; every access is audit-logged.",
-        "operationId": "staff_view_intake_api_staff_intakes__user_id__get",
+        "description": "One patient's confirmed details and visit answers.",
+        "operationId": "intake_api_staff_intakes__user_id__get",
         "parameters": [
           {
             "in": "path",
@@ -1608,9 +1798,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "title": "Response Staff View Intake Api Staff Intakes  User Id  Get",
-                  "type": "object"
+                  "$ref": "#/components/schemas/StaffIntakeOut"
                 }
               }
             },
@@ -1627,9 +1815,35 @@
             "description": "Validation Error"
           }
         },
-        "summary": "Staff View Intake",
+        "summary": "Intake",
         "tags": [
-          "system"
+          "staff"
+        ]
+      }
+    },
+    "/api/staff/schedule": {
+      "get": {
+        "description": "Upcoming booked visits, soonest first.",
+        "operationId": "schedule_api_staff_schedule_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/ScheduleItemOut"
+                  },
+                  "title": "Response Schedule Api Staff Schedule Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Schedule",
+        "tags": [
+          "staff"
         ]
       }
     },

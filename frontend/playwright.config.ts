@@ -6,6 +6,10 @@ import { randomBytes } from "node:crypto";
 const PORT = 8010;
 const DATABASE_URL = process.env.E2E_DATABASE_URL ?? "postgresql+pg8000://onboarding@localhost:5432/onboarding_e2e";
 const PYTHON = process.env.E2E_PYTHON ?? ".venv/bin/python";
+// A staff account for the staff-view test, created per run (the public demo has none). Set once in the
+// main process so the worker processes, which re-read this file, see the same password.
+process.env.E2E_STAFF_EMAIL ??= "staff@e2e.example.com";
+process.env.E2E_STAFF_PASSWORD ??= randomBytes(18).toString("base64url");
 
 export default defineConfig({
   testDir: "e2e",
@@ -25,7 +29,7 @@ export default defineConfig({
   webServer: {
     cwd: "../backend",
     // Fresh schema each run, appointment slots seeded, then the API serving ../frontend/dist.
-    command: `${PYTHON} -m alembic downgrade base && ${PYTHON} -m alembic upgrade head && ${PYTHON} -m scripts.seed && ${PYTHON} -m uvicorn app.main:app --port ${PORT}`,
+    command: `${PYTHON} -m alembic downgrade base && ${PYTHON} -m alembic upgrade head && ${PYTHON} -m scripts.seed && ${PYTHON} -m scripts.create_staff && ${PYTHON} -m uvicorn app.main:app --port ${PORT}`,
     url: `http://localhost:${PORT}/api/health`,
     reuseExistingServer: false,
     timeout: 120_000,
@@ -36,6 +40,8 @@ export default defineConfig({
       SESSION_SECRET: randomBytes(48).toString("base64url"),
       FIELD_ENCRYPTION_KEY: randomBytes(32).toString("base64").replace(/\+/g, "-").replace(/\//g, "_"),
       INVITE_CODES: "e2e-invite",
+      STAFF_EMAIL: process.env.E2E_STAFF_EMAIL,
+      STAFF_PASSWORD: process.env.E2E_STAFF_PASSWORD,
       CORS_ORIGINS: `http://localhost:${PORT}`,
       STATIC_DIR: "../frontend/dist",
       DEMO_MODE: "true",

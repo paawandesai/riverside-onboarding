@@ -19,6 +19,8 @@ export type Booking = Schemas["BookingOut"];
 export type Conflict = Schemas["ConflictOut"];
 export type Intake = Schemas["IntakeOut"];
 export type FieldSource = "ocr_confirmed" | "ocr_edited" | "manual";
+export type ScheduleItem = Schemas["ScheduleItemOut"];
+export type StaffIntake = Schemas["StaffIntakeOut"];
 
 // The assistant has 6 s on the server and falls back to rules; 15 s here covers a slow network.
 export const CHAT_TIMEOUT_MS = 15_000;
@@ -50,4 +52,6 @@ export const api = {
   support: (signals: Partial<Signals>) => request<Schemas["SupportOut"]>("POST", "/api/support/evaluate", { body: signals }),
   deleteData: () => request<void>("DELETE", "/api/me/data"),
   deleteAccount: () => request<void>("DELETE", "/api/me"),
+  staffSchedule: () => request<ScheduleItem[]>("GET", "/api/staff/schedule"),
+  staffIntake: (patientId: string) => request<StaffIntake>("GET", `/api/staff/intakes/${encodeURIComponent(patientId)}`),
 };
