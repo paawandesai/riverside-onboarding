@@ -1,7 +1,7 @@
 """Create a staff account from the command line (never via the public API).
 
 Usage: STAFF_EMAIL=... STAFF_PASSWORD=... python -m scripts.create_staff
-Do not run this against the public demo deployment: it has no admin or staff accounts.
+The public demo gets its staff login from the seed step instead (scripts/seed.py --demo-staff).
 """
 
 import os

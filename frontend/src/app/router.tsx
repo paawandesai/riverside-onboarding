@@ -24,6 +24,7 @@ const StaffPages = () => import("../steps/Staff");
 const RequireStaff = lazy(() => StaffPages().then((m) => ({ default: m.RequireStaff })));
 const StaffSchedule = lazy(() => StaffPages().then((m) => ({ default: m.StaffSchedule })));
 const StaffIntake = lazy(() => StaffPages().then((m) => ({ default: m.StaffIntake })));
+const StaffAnalytics = lazy(() => StaffPages().then((m) => ({ default: m.StaffAnalytics })));
 const later = (node: ReactNode) => <Suspense fallback={<p aria-live="polite">{t("common.loading")}</p>}>{node}</Suspense>;
 
 export const routes = [
@@ -58,6 +59,7 @@ export const routes = [
         element: later(<RequireStaff />),
         children: [
           { path: "/staff", element: later(<StaffSchedule />) },
+          { path: "/staff/analytics", element: later(<StaffAnalytics />) },
           {
             path: "/staff/patients/:patientId",
             element: later(<StaffIntake />),

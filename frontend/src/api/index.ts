@@ -22,6 +22,7 @@ export type Intake = Schemas["IntakeOut"];
 export type FieldSource = "ocr_confirmed" | "ocr_edited" | "manual";
 export type ScheduleItem = Schemas["ScheduleItemOut"];
 export type StaffIntake = Schemas["StaffIntakeOut"];
+export type Analytics = Schemas["AnalyticsOut"];
 
 // The assistant has 6 s on the server and falls back to rules; 15 s here covers a slow network.
 export const CHAT_TIMEOUT_MS = 15_000;
@@ -67,5 +68,6 @@ export const api = {
   deleteData: () => request<void>("DELETE", "/api/me/data"),
   deleteAccount: () => request<void>("DELETE", "/api/me"),
   staffSchedule: () => request<ScheduleItem[]>("GET", "/api/staff/schedule"),
+  staffAnalytics: (days: number) => request<Analytics>("GET", `/api/staff/analytics?${new URLSearchParams({ days: String(days) })}`),
   staffIntake: (patientId: string) => request<StaffIntake>("GET", `/api/staff/intakes/${encodeURIComponent(patientId)}`),
 };

@@ -45,7 +45,7 @@ The image tag is the current commit, so the working tree must be clean. Without
 ## Rotating credentials
 
 `infra/deploy.sh -auto-approve -var credentials_version=N` (one higher than the last value; the
-demo was last rotated to 2) issues a new demo password, invite code, session secret and both DB
+demo was last rotated to 2) issues new demo patient and staff passwords, invite code, session secret and both DB
 passwords. The app sets `CREDENTIALS_VERSION` from it, so the change rolls a new revision that
 reads the new values; the init container updates the app role's password and the seed step updates
 the demo user's password and signs out its sessions. Existing patient sessions end because the
@@ -62,7 +62,21 @@ Secrets User role on the vault):
 ```
 az keyvault secret show --vault-name <vault> --name demo-user-password --query value -o tsv
 az keyvault secret show --vault-name <vault> --name invite-codes --query value -o tsv
+az keyvault secret show --vault-name <vault> --name demo-staff-password --query value -o tsv
 ```
+
+If that returns Forbidden, give yourself read access first (an Owner or RBAC Administrator on the
+resource group can run this):
+
+```
+az role assignment create --assignee-object-id "$(az ad signed-in-user show --query id -o tsv)" \
+  --assignee-principal-type User --role "Key Vault Secrets User" \
+  --scope "$(az keyvault show --name <vault> --query id -o tsv)"
+```
+
+The staff login (`staff@example.com` by default, `demo_staff_email`) is read-only but sees every
+record on the demo. The made-up sample patients are reseeded by the app on start and rebooked by
+the hourly purge job (`DEMO_SAMPLE_PATIENTS`).
 
 ## After grading
 

@@ -32,7 +32,8 @@ $TF apply -input=false "$@" \
   -target=azurerm_key_vault_secret.email_hmac_key \
   -target=azurerm_key_vault_secret.field_encryption_key \
   -target=azurerm_key_vault_secret.invite_codes \
-  -target=azurerm_key_vault_secret.demo_user_password
+  -target=azurerm_key_vault_secret.demo_user_password \
+  -target=azurerm_key_vault_secret.demo_staff_password
 
 ACR="$($TF output -raw acr_login_server)"
 VAULT="$($TF output -raw key_vault_name)"
@@ -58,3 +59,4 @@ echo "== 4/4 app and purge job"
 $TF apply -input=false "$@" -var "image_tag=$TAG" -var "anthropic_key_in_vault=$ANTHROPIC_IN_VAULT"
 echo "app: $($TF output -raw app_url)"
 echo "demo login: $($TF output -raw demo_user_email); password and invite code are in Key Vault $VAULT (demo-user-password, invite-codes)"
+echo "staff login: $($TF output -raw demo_staff_email); password is in Key Vault $VAULT (demo-staff-password)"

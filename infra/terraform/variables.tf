@@ -55,6 +55,12 @@ variable "demo_user_email" {
   default     = "demo@example.com"
 }
 
+variable "demo_staff_email" {
+  description = "Login for the read-only staff demo account. The password is generated into Key Vault."
+  type        = string
+  default     = "staff@example.com"
+}
+
 variable "demo_retention_hours" {
   description = "Stored demo data older than this is purged by the scheduled job."
   type        = number

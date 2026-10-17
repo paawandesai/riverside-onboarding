@@ -1,6 +1,54 @@
 {
   "components": {
     "schemas": {
+      "AnalyticsOut": {
+        "properties": {
+          "funnel": {
+            "items": {
+              "$ref": "#/components/schemas/FunnelStepOut"
+            },
+            "title": "Funnel",
+            "type": "array"
+          },
+          "ocr": {
+            "items": {
+              "$ref": "#/components/schemas/OcrFieldOut"
+            },
+            "title": "Ocr",
+            "type": "array"
+          },
+          "ocr_records": {
+            "title": "Ocr Records",
+            "type": "integer"
+          },
+          "sessions": {
+            "title": "Sessions",
+            "type": "integer"
+          },
+          "since": {
+            "format": "date-time",
+            "title": "Since",
+            "type": "string"
+          },
+          "support_shown": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "title": "Support Shown",
+            "type": "object"
+          }
+        },
+        "required": [
+          "since",
+          "sessions",
+          "funnel",
+          "support_shown",
+          "ocr",
+          "ocr_records"
+        ],
+        "title": "AnalyticsOut",
+        "type": "object"
+      },
       "AssessmentIn": {
         "properties": {
           "accessibility_needs": {
@@ -539,6 +587,65 @@
         "title": "ExtractedField",
         "type": "object"
       },
+      "FunnelStepOut": {
+        "properties": {
+          "drop_off": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Drop Off"
+          },
+          "median_seconds": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Median Seconds"
+          },
+          "sessions": {
+            "title": "Sessions",
+            "type": "integer"
+          },
+          "share_of_start": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Share Of Start"
+          },
+          "step": {
+            "title": "Step",
+            "type": "string"
+          },
+          "timed_sessions": {
+            "title": "Timed Sessions",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "step",
+          "sessions",
+          "share_of_start",
+          "drop_off",
+          "median_seconds",
+          "timed_sessions"
+        ],
+        "title": "FunnelStepOut",
+        "type": "object"
+      },
       "HTTPValidationError": {
         "properties": {
           "detail": {
@@ -711,6 +818,46 @@
         "title": "MeOut",
         "type": "object"
       },
+      "OcrFieldOut": {
+        "properties": {
+          "confirmed": {
+            "title": "Confirmed",
+            "type": "integer"
+          },
+          "corrected": {
+            "title": "Corrected",
+            "type": "integer"
+          },
+          "correction_rate": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Correction Rate"
+          },
+          "field": {
+            "title": "Field",
+            "type": "string"
+          },
+          "typed": {
+            "title": "Typed",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "field",
+          "confirmed",
+          "corrected",
+          "typed",
+          "correction_rate"
+        ],
+        "title": "OcrFieldOut",
+        "type": "object"
+      },
       "ProgressOut": {
         "properties": {
           "assessment_done": {
@@ -772,6 +919,11 @@
           "patient_id": {
             "title": "Patient Id",
             "type": "string"
+          },
+          "sample": {
+            "default": false,
+            "title": "Sample",
+            "type": "boolean"
           },
           "slot": {
             "$ref": "#/components/schemas/SlotOut"
@@ -976,6 +1128,11 @@
           "patient_id": {
             "title": "Patient Id",
             "type": "string"
+          },
+          "sample": {
+            "default": false,
+            "title": "Sample",
+            "type": "boolean"
           }
         },
         "required": [
@@ -1853,6 +2010,52 @@
         "summary": "List Slots",
         "tags": [
           "scheduling"
+        ]
+      }
+    },
+    "/api/staff/analytics": {
+      "get": {
+        "description": "Funnel drop-off, time per step and OCR correction rates. Counts only, no patient data.\n\nFunnel events carry an anonymous session id, a step and an event name. OCR rates come from\nthe per-field provenance on intake records (no values), leaving out the made-up sample patients.",
+        "operationId": "analytics_api_staff_analytics_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "days",
+            "required": false,
+            "schema": {
+              "default": 7,
+              "maximum": 90,
+              "minimum": 1,
+              "title": "Days",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AnalyticsOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Analytics",
+        "tags": [
+          "staff"
         ]
       }
     },

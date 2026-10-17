@@ -287,3 +287,33 @@ details summary {
     grid-template-columns: 12rem minmax(0, 1fr);
   }
 }
+
+.tag--sample {
+  color: var(--ink-2);
+}
+.table-scroll {
+  overflow-x: auto;
+}
+.data-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-variant-numeric: tabular-nums;
+}
+.data-table th,
+.data-table td {
+  text-align: left;
+  padding: 8px 12px 8px 0;
+  border-bottom: 1px solid var(--line);
+  vertical-align: middle;
+}
+.data-table thead th {
+  font-size: var(--text-sm);
+}
+.meter-cell {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+.meter-cell meter {
+  width: 5rem;
+}

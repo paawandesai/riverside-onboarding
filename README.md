@@ -12,8 +12,8 @@ upload failures, low OCR confidence, a booking conflict or a long pause.
 
 **Live demo:** https://ca-onboarding.nicerock-b1cfe27d.eastus.azurecontainerapps.io (Azure Container
 Apps, one instance kept running during grading). Sign-up needs an invite code. Graders get the
-invite code and the demo login in the submission notes; neither is in this repository, and both are
-rotated after grading.
+invite code, the patient demo login and the staff demo login in the submission notes; none of them
+is in this repository, and all are rotated after grading.
 
 ## Grade it in 5 minutes
 
@@ -29,9 +29,11 @@ rotated after grading.
 4. **Booking.** Pick a day and time (shown in clinic time, US Eastern). Booking the same slot from a second browser shows "Someone just
    booked that time" with the nearest open times highlighted.
 5. **Privacy.** "My information" withdraws consent or deletes data; the deletion is immediate.
-6. **Staff view.** Not on the public demo, which by design has no staff account. Locally:
-   `STAFF_EMAIL=... STAFF_PASSWORD=... make staff`, then sign in at `/account?mode=signin` to see
-   the schedule and each intake. `frontend/e2e/staff.spec.ts` exercises it end to end in CI.
+6. **Staff view and analytics.** Sign out, then sign in with the staff demo login. "Schedule"
+   lists upcoming visits by day, including yours; six made-up sample patients are labelled as such
+   so there is always something to open. "Analytics" shows funnel drop-off, median time per step,
+   help cards shown, and ID-photo correction rates per field. Everything is read-only and every
+   read is audit-logged. `frontend/e2e/staff.spec.ts` covers it end to end in CI.
 7. **Evidence.** [Measured results](#measured-results) has every number with how it was measured;
    `make eval` and `make load` re-run them. CI runs secret scanning, lint, unit tests with coverage
    gates, Playwright end-to-end and accessibility tests, a license audit (including native
@@ -76,7 +78,7 @@ Specimen ID images for trying the upload step are in `fixtures/generated-ids/` (
 - It does not take payments, verify identity documents, or check insurance.
 - It does not serve minors (adults only, by self-attestation; not verified).
 - It is not HIPAA, GDPR or PCI compliant, has no BAA with any provider, and must not hold real data.
-- It has no admin UI. Staff get a read-only schedule and intake view (every read audit-logged); they can't edit records, and the public deployment has no staff account.
+- It has no admin UI. Staff get a read-only schedule, intake view and analytics (every read audit-logged); they can't edit records, manage accounts or change settings.
 - It does not send emails or SMS.
 
 ## Stack and why
@@ -97,8 +99,8 @@ Specimen ID images for trying the upload step are in `fixtures/generated-ids/` (
 Measured on 2026-10-16 and 2026-10-17 in a Linux x86_64 container with 4 CPUs and 15 GB RAM, Python 3.13,
 Tesseract 5.3.4, Postgres 16 on the same machine. Re-run with `make eval` and `make load`.
 
-**Tests** (re-measured 2026-10-17, after the audit fixes). Backend: 134 tests, 93% line coverage
-(gate 80%). Frontend unit: 46 tests, 93.0% lines (gate 80%), each screen also checked with axe.
+**Tests** (re-measured 2026-10-17, after the audit fixes). Backend: 141 tests, 93.6% coverage
+(gate 80%). Frontend unit: 48 tests, 93.2% lines (gate 80%), each screen also checked with axe.
 End-to-end (Playwright, real API, real Postgres, real Tesseract, Pixel 7 viewport): 11 flow tests
 covering the ID-scan path, unreadable photo to typing, assistant failure to the form, two patients
 booking the same slot, consent withdrawal deleting data, the staff view, deep links, and the security
@@ -217,8 +219,17 @@ above for the current number rather than trusting one written here.
   which the demo doesn't send. It is behind the invite code and rate-limited; sign-in timing no
   longer differs for unknown emails.
 - Stretch goals not done: other languages (the copy is in one file, `frontend/src/i18n/en.json`,
-  ready for translation, but only English exists), an analytics dashboard (funnel events are
-  recorded first-party, with no dashboard), and sentiment analysis beyond the crisis-language check.
+  ready for translation, but only English exists) and sentiment analysis beyond the crisis-language
+  check. The analytics dashboard (stretch goal 7) is done, in the staff view.
+- The public demo has a staff login, which the project's own rules originally ruled out (demo
+  logins were to be user-role only). The author changed that rule on 2026-10-17 so graders can see
+  the staff view and analytics live. That login can read every record on the demo, including what
+  other visitors typed; it is read-only, audit-logged, generated into Key Vault, never in the
+  repository, and rotated with the other demo credentials. The demo banner already tells visitors
+  not to enter real information.
+- Analytics are approximate by design: a "session" is one browser tab's anonymous id, time on a step
+  is the gap to the next page view (gaps over 30 minutes dropped), and on the public demo events
+  are deleted after 24 hours. Sample patients are left out of the OCR correction rates.
 - Age is self-attested; nothing verifies it.
 - Differences from the UI design spec, on purpose:
   - Chat replies are not streamed. The server validates and cleans the whole model output before
@@ -241,7 +252,8 @@ above for the current number rather than trusting one written here.
 | Microsoft Azure (hosting) | Everything stored by the app | Name, DOB, address (field-encrypted), email (encrypted, plus HMAC for lookup), assessment answers, bookings | Demo data purged after 24 hours by a scheduled job, or immediately on withdrawal/deletion. Postgres backups 7 days. Logs 30 days and contain no personal data. |
 | Tesseract (local) | ID image, in memory | Whatever is printed on the card | None; the image is discarded after the request. |
 
-No analytics SDK is used. Funnel events go to a first-party table (step, timestamp, random session id).
+No analytics SDK is used. Funnel events go to a first-party table (step, timestamp, random session id)
+and are only shown to staff as counts.
 A BAA is not needed for synthetic data; a real deployment would need BAAs with Anthropic and Microsoft first.
 Accepting Anthropic's BAA in the Claude Console applies to the whole organization and can't be
 undone, so a real deployment would use a separate organization for it, and could use only

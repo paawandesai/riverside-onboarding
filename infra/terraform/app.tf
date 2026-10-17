@@ -15,6 +15,7 @@ locals {
       azurerm_key_vault_secret.field_encryption_key,
       azurerm_key_vault_secret.invite_codes,
       azurerm_key_vault_secret.demo_user_password,
+      azurerm_key_vault_secret.demo_staff_password,
     ] : s.name => s.versionless_id
   }
   anthropic_secret_name = "anthropic-api-key"
@@ -38,8 +39,9 @@ locals {
   secret_env = merge(
     local.job_secret_env,
     {
-      INVITE_CODES       = azurerm_key_vault_secret.invite_codes.name
-      DEMO_USER_PASSWORD = azurerm_key_vault_secret.demo_user_password.name
+      INVITE_CODES        = azurerm_key_vault_secret.invite_codes.name
+      DEMO_USER_PASSWORD  = azurerm_key_vault_secret.demo_user_password.name
+      DEMO_STAFF_PASSWORD = azurerm_key_vault_secret.demo_staff_password.name
     },
     var.anthropic_key_in_vault ? { ANTHROPIC_API_KEY = local.anthropic_secret_name } : {}
   )
@@ -55,6 +57,8 @@ locals {
     DEMO_MODE                 = "true"
     DEMO_RETENTION_HOURS      = tostring(var.demo_retention_hours)
     DEMO_USER_EMAIL           = var.demo_user_email
+    DEMO_STAFF_EMAIL          = var.demo_staff_email
+    DEMO_SAMPLE_PATIENTS      = "true"
     DATABASE_SSL              = "true"
     CORS_ORIGINS              = local.app_origin
     ANTHROPIC_MODEL           = var.anthropic_model

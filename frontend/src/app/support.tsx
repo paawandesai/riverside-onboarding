@@ -116,12 +116,12 @@ const STEP_IDS: Record<string, string> = {
   "/deleted": "deleted",
   "/front-desk": "front_desk",
   "/staff": "staff",
+  "/staff/analytics": "staff_analytics",
 };
 
 export function stepId(pathname: string): string {
   const path = pathname.length > 1 ? pathname.replace(/\/+$/, "") : pathname;
-  if (path.startsWith("/staff/")) return "staff_patient";
-  return STEP_IDS[path] ?? "other";
+  return STEP_IDS[path] ?? (path.startsWith("/staff/") ? "staff_patient" : "other");
 }
 
 /** One idle timer per step: resets on activity, pauses while hidden or a file picker is open, fires once per step. */

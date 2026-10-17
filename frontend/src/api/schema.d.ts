@@ -407,6 +407,29 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/staff/analytics": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Analytics
+         * @description Funnel drop-off, time per step and OCR correction rates. Counts only, no patient data.
+         *
+         *     Funnel events carry an anonymous session id, a step and an event name. OCR rates come from
+         *     the per-field provenance on intake records (no values), leaving out the made-up sample patients.
+         */
+        get: operations["analytics_api_staff_analytics_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/staff/intakes/{user_id}": {
         parameters: {
             query?: never;
@@ -471,6 +494,26 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        /** AnalyticsOut */
+        AnalyticsOut: {
+            /** Funnel */
+            funnel: components["schemas"]["FunnelStepOut"][];
+            /** Ocr */
+            ocr: components["schemas"]["OcrFieldOut"][];
+            /** Ocr Records */
+            ocr_records: number;
+            /** Sessions */
+            sessions: number;
+            /**
+             * Since
+             * Format: date-time
+             */
+            since: string;
+            /** Support Shown */
+            support_shown: {
+                [key: string]: number;
+            };
+        };
         /** AssessmentIn */
         AssessmentIn: {
             /** Accessibility Needs */
@@ -637,6 +680,21 @@ export interface components {
             /** Value */
             value: string | null;
         };
+        /** FunnelStepOut */
+        FunnelStepOut: {
+            /** Drop Off */
+            drop_off: number | null;
+            /** Median Seconds */
+            median_seconds: number | null;
+            /** Sessions */
+            sessions: number;
+            /** Share Of Start */
+            share_of_start: number | null;
+            /** Step */
+            step: string;
+            /** Timed Sessions */
+            timed_sessions: number;
+        };
         /** HTTPValidationError */
         HTTPValidationError: {
             /** Detail */
@@ -698,6 +756,19 @@ export interface components {
             /** Role */
             role: string;
         };
+        /** OcrFieldOut */
+        OcrFieldOut: {
+            /** Confirmed */
+            confirmed: number;
+            /** Corrected */
+            corrected: number;
+            /** Correction Rate */
+            correction_rate: number | null;
+            /** Field */
+            field: string;
+            /** Typed */
+            typed: number;
+        };
         /** ProgressOut */
         ProgressOut: {
             /** Assessment Done */
@@ -723,6 +794,11 @@ export interface components {
             identity_confirmed: boolean;
             /** Patient Id */
             patient_id: string;
+            /**
+             * Sample
+             * @default false
+             */
+            sample: boolean;
             slot: components["schemas"]["SlotOut"];
         };
         /** SignalsIn */
@@ -806,6 +882,11 @@ export interface components {
             full_name: string | null;
             /** Patient Id */
             patient_id: string;
+            /**
+             * Sample
+             * @default false
+             */
+            sample: boolean;
         };
         /** SupportActionOut */
         SupportActionOut: {
@@ -1457,6 +1538,37 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["SlotOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    analytics_api_staff_analytics_get: {
+        parameters: {
+            query?: {
+                days?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AnalyticsOut"];
                 };
             };
             /** @description Validation Error */

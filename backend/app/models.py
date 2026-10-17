@@ -27,6 +27,9 @@ class User(Base):
     adult_attested: Mapped[bool] = mapped_column(Boolean, default=False)
     # Bumped on sign-out; session tokens carry it, so older tokens stop working.
     session_version: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
+    # Made-up patients the demo seeds so the staff view has something to show; they can't sign in
+    # and are left out of analytics.
+    synthetic: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false")
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
 
 

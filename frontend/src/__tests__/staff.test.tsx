@@ -55,3 +55,51 @@ test("an intake that doesn't exist says so", async () => {
   renderApp("/staff/patients/p9");
   expect(await screen.findByText("This patient hasn't started their intake.")).toBeInTheDocument();
 });
+
+const ANALYTICS = {
+  since: new Date(2030, 0, 1, 12).toISOString(),
+  sessions: 12,
+  funnel: [
+    { step: "start", sessions: 10, share_of_start: 1, drop_off: null, median_seconds: 12, timed_sessions: 9 },
+    { step: "account", sessions: 6, share_of_start: 0.6, drop_off: 0.4, median_seconds: 95, timed_sessions: 5 },
+    { step: "done", sessions: 0, share_of_start: 0, drop_off: 1, median_seconds: null, timed_sessions: 0 },
+  ],
+  support_shown: { long_pause: 3 },
+  ocr: [{ field: "dob", confirmed: 3, corrected: 1, typed: 2, correction_rate: 0.25 }],
+  ocr_records: 6,
+};
+
+test("staff see funnel drop-off, time per step and OCR correction rates, and can change the period", async () => {
+  const calls = mockFetch({
+    "GET /api/auth/me": { body: STAFF },
+    "GET /api/staff/analytics": { body: ANALYTICS },
+  });
+  const { container } = renderApp("/staff/analytics");
+  expect(await screen.findByRole("heading", { level: 1, name: "Analytics" })).toBeInTheDocument();
+  const funnel = await screen.findByRole("region", { name: "Where patients drop off" });
+  const account = within(funnel).getByRole("row", { name: /Account/ });
+  expect(within(account).getByText("60%")).toBeInTheDocument();
+  expect(within(account).getByText("40%")).toBeInTheDocument();
+  expect(within(account).getByText("1 min 35 s")).toBeInTheDocument();
+  const ocr = screen.getByRole("region", { name: "ID photo corrections" });
+  expect(within(within(ocr).getByRole("row", { name: /Date of birth/ })).getByText("25%")).toBeInTheDocument();
+  expect(screen.getByText("long pause: 3")).toBeInTheDocument();
+  expect(await axeViolations(container)).toEqual([]);
+
+  await userEvent.click(screen.getByRole("button", { name: "Last 30 days" }));
+  expect(screen.getByRole("button", { name: "Last 30 days" })).toHaveAttribute("aria-pressed", "true");
+  await vi.waitFor(() => expect(calls.some((c) => c.url === "/api/staff/analytics?days=30")).toBe(true));
+});
+
+test("made-up sample patients are labelled, and staff can sign out", async () => {
+  const calls = mockFetch({
+    "GET /api/auth/me": { body: STAFF },
+    "GET /api/staff/schedule": { body: [{ ...ITEM, sample: true }] },
+    "POST /api/auth/logout": { status: 204 },
+  });
+  renderApp("/staff");
+  expect(await screen.findByText("Sample patient (made up)")).toBeInTheDocument();
+  expect(screen.getByRole("link", { name: "Analytics" })).toBeInTheDocument();
+  await userEvent.click(screen.getByRole("button", { name: "Sign out" }));
+  await vi.waitFor(() => expect(calls.some((c) => c.method === "POST" && c.url === "/api/auth/logout")).toBe(true));
+});

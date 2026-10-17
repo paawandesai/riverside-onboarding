@@ -1,5 +1,5 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { CalendarDays, CircleHelp, Type, UserRound, WifiOff } from "lucide-react";
+import { CalendarDays, ChartColumn, CircleHelp, LogOut, Type, UserRound, WifiOff } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Link, Outlet, useNavigate } from "react-router";
 import { api } from "../api";
@@ -74,6 +74,12 @@ function Shell() {
     navigate("/saved");
   };
 
+  const staffSignOut = async () => {
+    await api.logout().catch(() => undefined);
+    queryClient.clear();
+    navigate("/account?mode=signin");
+  };
+
   useEffect(() => {
     support.setGlobalHandler((action) => {
       if (action === "talk_to_person") setHelpOpen(true);
@@ -104,9 +110,17 @@ function Shell() {
             <Type aria-hidden="true" size={20} /> {t("header.textSize")}
           </button>
           {signedIn && me.data.role === "staff" && (
-            <Link to="/staff" className="btn btn--link">
-              <CalendarDays aria-hidden="true" size={20} /> {t("header.schedule")}
-            </Link>
+            <>
+              <Link to="/staff" className="btn btn--link">
+                <CalendarDays aria-hidden="true" size={20} /> {t("header.schedule")}
+              </Link>
+              <Link to="/staff/analytics" className="btn btn--link">
+                <ChartColumn aria-hidden="true" size={20} /> {t("header.analytics")}
+              </Link>
+              <button type="button" className="btn btn--link" onClick={() => void staffSignOut()}>
+                <LogOut aria-hidden="true" size={20} /> {t("header.signOut")}
+              </button>
+            </>
           )}
           {signedIn && me.data.role !== "staff" && (
             <>

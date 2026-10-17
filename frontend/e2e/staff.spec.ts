@@ -29,6 +29,19 @@ test("a booked patient appears on the staff schedule with their intake", async (
   await expect(staff.getByRole("region", { name: /What the patient told us/ })).toContainText("Knee pain");
   await expectAccessible(staff);
 
+  // Analytics: the patient's session above shows up as counts only.
+  await staff.getByRole("link", { name: "Analytics" }).click();
+  await expect(staff.getByRole("heading", { level: 1, name: "Analytics" })).toBeVisible();
+  const funnel = staff.getByRole("region", { name: "Where patients drop off" });
+  await expect(funnel.getByRole("row", { name: /Booked/ })).toBeVisible();
+  await expect(staff.getByRole("region", { name: "ID photo corrections" })).toBeVisible();
+  await expect(staff.locator("main")).not.toContainText("Morgan");
+  await expectAccessible(staff);
+  await expectNoHorizontalScroll(staff);
+  await staff.getByRole("button", { name: "Sign out" }).click();
+  await expect(staff.getByRole("heading", { name: "Sign in" })).toBeVisible();
+  expect((await staff.request.get("/api/staff/analytics")).status()).toBe(401);
+
   // The patient can't reach the staff pages or API.
   await page.goto("/staff");
   await expect(page.getByRole("alert")).toHaveText("This page is for clinic staff.");

@@ -37,4 +37,5 @@ domain expert has reviewed them.
 | Rule-based fallback classifier and crisis-language pattern (`backend/app/services/chat.py`) | 30/30 and 38/40 on sets it was tuned against; 8/8 crisis messages, no false alarms on the other 62 | Accuracy on unseen phrasing |
 | Terraform (`infra/terraform`) | `terraform validate`, and applied to the demo subscription with `infra/deploy.sh` | Review by someone who runs Azure in production (network isolation, Key Vault hardening) |
 | Security fixes from the final audit (rate limits, sessions, upload limits, database role, CSP nonce) | Backend and end-to-end tests for each | An independent security review |
+| Staff analytics (`backend/app/routers/staff.py`, `frontend/src/steps/Staff.tsx`) and the made-up sample patients (`backend/app/services/demo.py`) | Backend, unit and end-to-end tests, including that sample patients stay out of the OCR rates | Review of the metric definitions by someone who runs a clinic's intake |
 | HEIC test sample (`fixtures/generated-heic-sample.heic`) | Decoded by the upload test | Nothing further: it only checks that HEIC decodes |

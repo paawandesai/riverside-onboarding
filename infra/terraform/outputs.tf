@@ -15,3 +15,7 @@ output "key_vault_name" {
 output "demo_user_email" {
   value = var.demo_user_email
 }
+
+output "demo_staff_email" {
+  value = var.demo_staff_email
+}

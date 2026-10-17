@@ -4,8 +4,10 @@ Runs hourly as a scheduled job (see infra/terraform):
 * accounts created more than DEMO_RETENTION_HOURS ago are deleted with all their data;
 * the shared demo account is kept, and its data is cleared only once nobody has touched it for
   DEMO_RETENTION_HOURS, so a reviewer partway through the flow doesn't lose it;
+* the staff login and the made-up sample patients are kept;
 * anonymous funnel events past the window are deleted;
-* appointment slots are topped up so the next two weeks always have open times.
+* appointment slots are topped up so the next two weeks always have open times, and sample
+  patients whose visit has passed get a new one (when DEMO_SAMPLE_PATIENTS is set).
 The audit log (ids and action names only) is kept.
 """
 
@@ -18,6 +20,7 @@ from app.config import get_settings
 from app.db import get_db
 from app.models import Booking, Consent, FunnelEvent, IntakeRecord, User
 from app.security import email_lookup_key
+from app.services.demo import seed_sample_patients
 from app.services.privacy import delete_account, purge_user_data
 from app.services.scheduling import seed_slots
 
@@ -40,7 +43,7 @@ def main() -> None:
     keep = email_lookup_key(demo_email) if demo_email else None
     db = next(get_db())
     deleted = cleared = 0
-    for user in db.scalars(select(User).where(User.role == "user")).all():
+    for user in db.scalars(select(User).where(User.role == "user", User.synthetic.is_(False))).all():
         if user.email_lookup == keep:
             latest = last_activity(db, user.id)
             if latest is not None and latest < cutoff:
@@ -52,7 +55,11 @@ def main() -> None:
     events = db.execute(delete(FunnelEvent).where(FunnelEvent.at < cutoff)).rowcount
     db.commit()
     added = seed_slots(db, days=14)
-    print(f"deleted {deleted} accounts, cleared the demo account {cleared}x, removed {events} events, added {added} slots")
+    rebooked = seed_sample_patients(db) if os.environ.get("DEMO_SAMPLE_PATIENTS") else 0
+    print(
+        f"deleted {deleted} accounts, cleared the demo account {cleared}x, removed {events} events, "
+        f"added {added} slots, rebooked {rebooked} sample visits"
+    )
 
 
 if __name__ == "__main__":

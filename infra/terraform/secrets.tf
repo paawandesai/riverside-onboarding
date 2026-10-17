@@ -37,6 +37,11 @@ ephemeral "random_password" "demo_user" {
   special = false
 }
 
+ephemeral "random_password" "demo_staff" {
+  length  = 24
+  special = false
+}
+
 ephemeral "random_bytes" "field_key" {
   length = 32
 }
@@ -88,6 +93,15 @@ resource "azurerm_key_vault_secret" "invite_codes" {
   name             = "invite-codes"
   key_vault_id     = azurerm_key_vault.kv.id
   value_wo         = ephemeral.random_password.invite.result
+  value_wo_version = var.credentials_version
+  depends_on       = [time_sleep.rbac_propagation]
+}
+
+# Staff login for the public demo (Paawan's call, 2026-10-17): sees every record, read-only.
+resource "azurerm_key_vault_secret" "demo_staff_password" {
+  name             = "demo-staff-password"
+  key_vault_id     = azurerm_key_vault.kv.id
+  value_wo         = ephemeral.random_password.demo_staff.result
   value_wo_version = var.credentials_version
   depends_on       = [time_sleep.rbac_propagation]
 }
