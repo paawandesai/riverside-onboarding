@@ -74,8 +74,8 @@ def eval_ocr(folder: Path) -> dict:
     }
 
 
-def eval_intents(use_llm: bool) -> dict:
-    cases = json.loads((ROOT / "eval" / "intents.json").read_text())["cases"]
+def eval_intents(use_llm: bool, file: str = "intents.json") -> dict:
+    cases = json.loads((ROOT / "eval" / file).read_text())["cases"]
     out = {}
     paths = [("fallback_rules", lambda text: chat.rule_based_turn(text).intent)]
     if use_llm:
@@ -183,6 +183,8 @@ def main() -> None:
         # last OCR change and run once, so it is the cleanest estimate.
         "ocr": [eval_ocr(ROOT / "fixtures" / f) for f in ("generated-ids", "generated-ids-holdout", "generated-ids-holdout2")],
         "intents": eval_intents(use_llm),
+        # Written before the last prompt change and never used to tune the prompt or the rules.
+        "intents_holdout": eval_intents(use_llm, "intents-holdout.json"),
         "adversarial": {"chat": eval_adversarial_chat(use_llm), "ocr": eval_adversarial_ocr()},
     }
     out = ROOT / "eval" / "results" / "latest.json"
@@ -196,6 +198,8 @@ def main() -> None:
         print(f"    by category {o['per_category']}  wrong-but-shown-for-review {o['wrong_value_shown_for_review']}  blank-for-user {o['left_blank_for_user']}")
     for name, r in report["intents"].items():
         print(f"Intents via {name:<15} {r['accuracy']:5.1f}%  every intent handled: {r['every_intent_handled']}  per-intent {r['per_intent']}")
+    for name, r in report["intents_holdout"].items():
+        print(f"Held-out intents via {name:<6} {r['accuracy']:5.1f}%  per-intent {r['per_intent']}  misses {[m['id'] for m in r['misses']]}")
     if "claude" not in report["intents"]:
         print("Intents via claude          not run (set ANTHROPIC_RIVERSIDE_API_KEY to run; costs API credit)")
     a = report["adversarial"]["chat"]

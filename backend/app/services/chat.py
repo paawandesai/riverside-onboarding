@@ -19,17 +19,28 @@ MAX_REPLY_CHARS = 600
 
 AI_DISCLOSURE = "You're chatting with an AI assistant. A member of our care team reviews your answers before your visit."
 
+# Crisis language in common forms, including indirect ones ("better off without me", "no point").
+# Erring towards a false alarm is deliberate: a match only adds crisis resources to the reply.
 _DISTRESS = re.compile(
     r"\b(suicid\w*|kill (?:my|him|her)self|end (?:it all|my life)|self[- ]?harm|hurt(?:ing)? myself|"
-    r"don'?t want to (?:live|be here)|hopeless|can'?t go on|panic attack|overwhelmed|terrified|in crisis)\b",
+    r"(?:want|wanna|wish(?: i)?) (?:to )?(?:die|be dead|was dead|were dead)|better off (?:dead|without me)|"
+    r"don'?t want to (?:live|be here|wake up)|(?:no|don'?t see the|what'?s the) point (?:of|in|to)? ?(?:living|going on|any of this|anything)|"
+    r"hopeless|can'?t go on|can'?t cope|can'?t take (?:it|this|much more)(?: anymore)?|(?:it'?s|everything is) too much|"
+    r"can'?t stop (?:crying|shaking)|crying all day|panic attacks?|overwhelmed|terrified|(?:really|so|very) (?:scared|frightened)|"
+    r"in crisis|no one to talk to|don'?t know who to talk to)\b",
     re.I,
 )
-_RESCHEDULE = re.compile(r"\b(reschedul\w*|move my (?:appointment|visit)|change (?:my|the) (?:appointment|time|visit)|cancel\w*)\b", re.I)
+_RESCHEDULE = re.compile(
+    r"\b(reschedul\w*|(?:move|push|switch|change) (?:back )?(?:my|the) (?:appointment|appt|time|visit|booking)|cancel\w*|"
+    r"can'?t make (?:it|my|the|\w+day)|(?:booked|picked) the wrong (?:day|time)|(?:earlier|later) than the time|another day)\b",
+    re.I,
+)
 _QUESTION = re.compile(r"(\?\s*$)|^\s*(how|what|when|where|why|who|can|do|does|is|are|will)\b", re.I)
 # The fallback only answers questions about the clinic or sign-up; other questions are out of scope.
 _CLINIC_TOPIC = re.compile(
     r"\b(clinic|hours?|open|walk[- ]?ins?|parking|insurance|cost|pay|visit|appointment|sign(?:ing)?[- ]?up|"
-    r"information|privacy|data|doctor|nurse|staff|bring|telehealth|location|address|after|next|form|consent|delete)\b",
+    r"information|privacy|data|doctor|nurse|staff|bring|telehealth|location|address|after|next|form|consent|delete|"
+    r"medicaid|medicare|answers|bot|human|real person|weekends?|first day|come in with me)\b",
     re.I,
 )
 _DETAILS = re.compile(

@@ -181,3 +181,25 @@ def test_assessment_summary_is_marked_non_binding(user_client):
     summary = r.json()["assessment_summary"]
     assert summary.startswith("Non-binding intake summary for staff review")
     assert "Accessibility needs: not provided" in summary
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        "i keep thinking everyone would be better off without me",
+        "honestly i dont see the point of any of this anymore",
+        "everything is too much right now, I can't cope",
+        "I've been crying all day and I don't know who to talk to",
+        "I wish I was dead",
+    ],
+)
+def test_indirect_crisis_language_gets_the_safety_reply_without_the_model(text):
+    result = chat.run_turn([{"role": "user", "content": text}])
+    assert result.intent == "express_distress" and "988" in result.reply and result.support is not None
+
+
+@pytest.mark.parametrize(
+    "text", ["I'm scared of needles, can someone be gentle", "no point in waiting, book me in", "my knee hurts too much to walk"]
+)
+def test_ordinary_worry_is_not_treated_as_a_crisis(text):
+    assert chat.rule_based_turn(text).intent != "express_distress"

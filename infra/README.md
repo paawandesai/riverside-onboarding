@@ -38,6 +38,7 @@ The image tag is the current commit, so the working tree must be clean. Without
 
 - Rotate the demo login, invite code, session secret and DB password:
   `infra/deploy.sh -var credentials_version=2`.
+- Stop keeping an instance warm: `infra/deploy.sh -var min_replicas=0`.
 - Or remove everything: `terraform -chdir=infra/terraform destroy`.
 
 ## Known limits
@@ -48,5 +49,7 @@ The image tag is the current commit, so the working tree must be clean. Without
 - No VNet: Postgres allows connections from Azure services (firewall rule `0.0.0.0`), protected
   by TLS and a generated password. A production setup would use VNet integration and a
   private endpoint, which the free account's consumption plan doesn't include.
-- `min_replicas = 0` keeps cost near zero; the first request after idle pays a cold start
-  (migrations, seed, model check). Set `-var min_replicas=1` for steady latency.
+- `min_replicas` defaults to 1 during grading: one 1 vCPU / 2 GiB instance stays up, billed at
+  Azure's idle rate when not serving, which costs more than scale-to-zero (the free account's credit
+  covers it). After grading, `infra/deploy.sh -var min_replicas=0` scales to zero again; the first
+  request after idle then pays a cold start (migrations, seed, model check).

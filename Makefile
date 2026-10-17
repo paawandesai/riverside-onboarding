@@ -1,4 +1,4 @@
-.PHONY: setup db seed api web test e2e lint eval load licenses
+.PHONY: setup db seed staff api web test e2e lint eval load licenses
 
 setup:            ## install backend + frontend deps and git hooks
 	cd backend && python3 -m venv .venv && .venv/bin/pip install -r requirements-dev.txt
@@ -10,6 +10,9 @@ db:               ## apply migrations
 
 seed:             ## appointment slots (+ demo user if DEMO_USER_EMAIL/PASSWORD set)
 	cd backend && .venv/bin/python -m scripts.seed $(if $(DEMO_USER_EMAIL),--demo-user,)
+
+staff:            ## local staff account from STAFF_EMAIL / STAFF_PASSWORD (never on the public demo)
+	cd backend && .venv/bin/python -m scripts.create_staff
 
 api:
 	cd backend && .venv/bin/uvicorn app.main:app --reload --port 8000

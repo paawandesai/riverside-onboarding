@@ -62,9 +62,9 @@ variable "demo_retention_hours" {
 }
 
 variable "min_replicas" {
-  description = "0 scales to zero when idle (cheapest; first request after idle pays a cold start)."
+  description = "1 keeps one instance warm so graders never wait on a cold start. Set 0 after grading to scale to zero when idle (cheapest)."
   type        = number
-  default     = 0
+  default     = 1
 }
 
 variable "tags" {
