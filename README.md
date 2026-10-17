@@ -5,9 +5,9 @@
 > HIPAA compliant, and has not been audited.
 
 A patient sign-up flow for a fictional community clinic. A new patient creates an account,
-reads and accepts a consent notice, optionally photographs an ID card so the form fills itself,
-confirms or corrects every field, chats with an AI assistant about why they want a visit, and
-books an appointment. Supportive content appears when the flow detects distress, repeated
+reads and accepts a consent notice, chats with an AI assistant (or fills a short form) about why
+they want a visit, optionally photographs an ID card so their details fill themselves, confirms or
+corrects every field, and books an appointment. Supportive content appears when the flow detects distress, repeated
 upload failures, low OCR confidence, a booking conflict or a long pause.
 
 ## Quick start (local)
@@ -20,7 +20,7 @@ docker compose up --build   # http://localhost:8000, sign up with one of your IN
 ```
 
 Without Docker: `make setup db seed`, then `make api` and `make web` (http://localhost:5173).
-`make test`, `make lint`, `make eval`, `make load INVITE_CODE=...`, `make licenses`.
+`make test`, `make e2e`, `make lint`, `make eval`, `make load INVITE_CODE=...`, `make licenses`.
 
 `ANTHROPIC_RIVERSIDE_API_KEY` is optional. Without it the assistant runs on a rule-based
 classifier and says so in the UI; the rest of the flow is unchanged.
@@ -32,12 +32,12 @@ Specimen ID images for trying the upload step are in `fixtures/generated-ids/` (
 | Step | Behaviour |
 |---|---|
 | Sign-up | Invite code required, adult (18+) self-attestation, argon2 password hash, httpOnly signed session cookie. Every public account is `user` role. |
-| Consent | Shown before any upload or question. States what is collected, that chat text goes to Anthropic and how long Anthropic keeps it, that staff review the summary, and how to withdraw. Nothing is stored before the consent click. |
+| Consent | Shown before any upload or question: five short points (what is collected, that chat text goes to Anthropic and how long Anthropic keeps it, that staff review the summary, how to withdraw) with the full notice one tap away. ID scanning is a separate, optional switch; without it the upload endpoint refuses photos and the patient types instead. Nothing is stored before the consent click. |
 | ID upload | JPEG/PNG/WEBP/HEIC up to 8 MB, magic-byte check, decompression-bomb guard, EXIF/GPS stripped. Tesseract reads name, DOB and address **on the server, in memory**. The image is never stored and never sent to any model. |
 | Confirm | Every extracted field is shown for the user to confirm or edit; low-confidence and missing fields are highlighted. Manual entry always works, including when OCR is down. The source of each field (OCR confirmed, OCR edited, manual) is recorded. |
-| Assistant | Claude classifies each message into one of five intents and extracts four visit fields with a strict JSON schema. The server validates the output, strips links, and replaces any claim to have booked or cancelled something. Distress keywords force the safety reply (988 / 911) regardless of the model. On timeout or error the rule-based fallback takes over. The AI disclosure is shown at the start. |
+| Assistant | Comes before the ID step. A plain form is offered alongside the chat and takes over, prefilled with what the patient already said, if the assistant fails. Claude classifies each message into one of five intents and extracts four visit fields with a strict JSON schema. The server validates the output, strips links, and replaces any claim to have booked or cancelled something. Distress keywords force the safety reply (988 / 911) regardless of the model. On timeout or error the rule-based fallback takes over. The AI disclosure is shown at the start. |
 | Summary | A deterministic, non-binding summary for staff review. No diagnosis or triage. |
-| Booking | Open slots by visit type; a partial unique index makes double-booking impossible even under concurrent requests (409 with a friendly message). Rebooking replaces the existing booking. |
+| Booking | Day and time chips by visit type; a partial unique index makes double-booking impossible even under concurrent requests. On a conflict the API returns the three nearest open times and the page highlights them. Rebooking replaces the existing booking. The confirmation offers a calendar (.ics) file. |
 | Privacy | Withdraw consent (purges intake data and bookings), delete data, or delete the account at any time. |
 
 ## What it does NOT do
@@ -58,18 +58,25 @@ Specimen ID images for trying the upload step are in `fixtures/generated-ids/` (
 | API | FastAPI, SQLAlchemy 2, Alembic, Postgres 16 | Typed request validation, simple async I/O for model calls, mainstream for Python ML/OCR work. |
 | OCR | Tesseract 5 via pytesseract, Pillow preprocessing | Runs locally (no image leaves the server), Apache-2.0, no GPU. |
 | Assistant | Claude API, structured outputs | Schema-constrained JSON is validated server-side; model id is configuration. |
-| Frontend | React 19 + TypeScript + Vite | Small SPA served by the API container (one origin, no CORS in production). |
+| Frontend | React 19 + TypeScript + Vite, React Router, TanStack Query, React Hook Form + zod, Radix Dialog | Small SPA served by the API container (one origin, no CORS in production). API types are generated from the backend's OpenAPI schema; CI fails if they drift. Screens follow the UI design spec (mobile first, Atkinson Hyperlegible Next and Literata, tokens in `src/styles/tokens.css`). |
 | Auth | Own (argon2 + signed httpOnly cookie) | Keeps identity data in our database; no third-party auth processor for a demo. Plays the role Supabase Auth would. |
-| Tests | pytest (+ coverage gate), Jest + Testing Library, ESLint, ruff | The Python/TS equivalents of RSpec and RuboCop. |
+| Tests | pytest (+ coverage gate), Vitest + Testing Library + axe-core, Playwright + axe, ESLint, ruff | The Python/TS equivalents of RSpec and RuboCop. Vitest instead of Jest: React Router 8 is ESM-only and Jest cannot load it without a transform layer; Vitest runs the same `test`/`expect` API natively. |
 | Deploy | Docker, Terraform, Azure Container Apps, Postgres Flexible Server, Key Vault | Matches Riverside's Azure / Terraform / Docker stack. See `infra/README.md`. |
-| CI | GitLab CI | gitleaks, lint, tests with coverage gates, license audit, OCR eval, Terraform validate, image build. |
+| CI | GitLab CI | gitleaks, lint, tests with coverage gates, end-to-end tests, OpenAPI drift check, license audit, OCR eval, Terraform validate, image build. |
 
 ## Measured results
 
 Measured on 2026-10-16 in a Linux x86_64 container with 4 CPUs and 15 GB RAM, Python 3.13,
 Tesseract 5.3.4, Postgres 16 on the same machine. Re-run with `make eval` and `make load`.
 
-**Tests.** Backend: 77 tests, 94% line coverage (gate 80%). Frontend: 14 tests, 88% lines (gate 80%).
+**Tests** (re-measured 2026-10-17). Backend: 82 tests, 94% line coverage (gate 80%). Frontend unit:
+31 tests, 92.7% lines (gate 80%), each screen also checked with axe. End-to-end (Playwright, real API,
+real Postgres, real Tesseract, Pixel 7 viewport): 9 tests covering the ID-scan path, unreadable photo
+to typing, assistant failure to the form, two patients booking the same slot, consent withdrawal
+deleting data, and the security headers; plus 3 accessibility tests on mobile and desktop (axe WCAG 2.2
+AA with real CSS, no sideways scroll at 320 px, keyboard-only start, 200% text).
+
+**Frontend size.** Initial JavaScript is 128 KiB gzipped (budget 170 KiB); later steps load on demand.
 
 **OCR field accuracy** (name, DOB, address; 3 fields x 30 images per set):
 
@@ -114,6 +121,15 @@ never sent to a model. The Claude path for these cases has not been run yet.
 - The deployment uses a public Postgres endpoint restricted to Azure services (no VNet on the
   free account) and scales to zero, so the first request after idle is slow.
 - Age is self-attested; nothing verifies it.
+- Differences from the UI design spec, on purpose:
+  - Chat replies are not streamed. The server validates and cleans the whole model output before
+    anything is shown, which rules out showing tokens as they arrive.
+  - The ID photo is discarded as soon as it is read, not "after you confirm"; nothing is kept to confirm against.
+  - A booking conflict offers the nearest times or the front-desk number, not "we'll call you":
+    there is no callback feature.
+  - Styles are one global stylesheet plus design tokens rather than CSS Modules.
+  - Unit tests mock `fetch` directly instead of using MSW; the end-to-end tests use the real API.
+  - The front-desk number 555-0142 is fictional.
 - The CI image-build job is manual: the GitLab runner is unprivileged and blocks user
   namespaces, so Docker-in-Docker and Buildah both fail there. The image is built and
   smoke-tested locally and by `infra/deploy.sh`.
@@ -151,6 +167,9 @@ at startup and fails fast if it is unavailable.
 - `/api/health` reports configuration and last-success timestamps and never calls a model.
 - Demo safeguards: invite code, persistent synthetic-data banner, `noindex` header and meta tag,
   scheduled purge, user-role-only demo account with rotation (`infra/README.md`).
+- Every state-changing API call must carry an `X-Requested-With` header (a CSRF guard on top of
+  the SameSite cookie). The app sends a strict Content-Security-Policy (`script-src 'self'`, no inline
+  scripts or styles), `X-Frame-Options: DENY` and a Permissions-Policy allowing only the camera.
 - Untrusted text (chat, OCR output) is treated as data: delimited and neutralised in the prompt,
   model output is schema-validated and never executed, no HTML rendering of user or model text.
 
@@ -166,7 +185,7 @@ No model was asked to produce them. `eval/intents.json` and the adversarial case
 
 ```
 backend/        FastAPI app, Alembic migrations, tests, seed/purge scripts
-frontend/       React SPA and Jest tests
+frontend/       React SPA, Vitest unit tests, Playwright end-to-end tests (e2e/)
 eval/           run_eval.py, intent set, adversarial cases
 fixtures/       generated specimen ID images and labels
 k6/             load test

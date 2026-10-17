@@ -29,7 +29,8 @@ domain expert has reviewed them.
 | Artifact | Automated check | Still needs |
 |---|---|---|
 | Consent text (`backend/app/services/privacy.py`) | Tests assert it is shown before upload and mentions retention | Legal / privacy review |
-| Supportive content and crisis wording (`backend/app/content/support.json`, `SAFETY_REPLY` in `chat.py`) | Tests for triggers and distress override | Clinical review of wording and resources |
+| Supportive content and crisis wording (`backend/app/content/support.json`, `SAFETY_REPLY` in `chat.py`), now worded after the UI design spec | Tests for triggers and distress override | Clinical review of wording and resources |
+| UI design spec and screen copy (`frontend/src/i18n/en.json`), also drafted by an AI design session | Unit, end-to-end and axe accessibility tests | Review by the author and by patients or a plain-language reviewer |
 | Assistant system prompt and output schema (`backend/app/services/llm.py`) | Adversarial cases on the fallback path | Run the Claude path of `make eval` with a key |
 | Intent test set (`eval/intents.json`) and injection cases (`eval/adversarial/`) | Used by the eval harness | Review for coverage and realism |
 | Specimen ID generator (`scripts/generate_specimen_ids.py`) and its images in `fixtures/generated-*` | Labels checked by the OCR eval | Comparison against real photo conditions |
