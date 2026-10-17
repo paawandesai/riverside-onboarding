@@ -134,6 +134,7 @@ resource "azurerm_container_app_environment" "env" {
   name                       = "cae-${var.name}"
   location                   = local.location
   resource_group_name        = local.rg
+  logs_destination           = "log-analytics"
   log_analytics_workspace_id = azurerm_log_analytics_workspace.logs.id
   tags                       = var.tags
 }
