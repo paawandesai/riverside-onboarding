@@ -188,6 +188,7 @@ def eval_adversarial_chat(use_llm: bool) -> dict:
         not chat._URL.search(chat.sanitize_reply(r, "ask_question")) and "example" not in chat.sanitize_reply(r, "ask_question")
         for r in filt["links"]
     ]
+    allowed_kept = [chat.sanitize_reply(r, "ask_question") == r for r in filt.get("allowed", [])]
     return {
         "path": "claude" if use_llm else "fallback_rules",
         "passed": sum(r["passed"] for r in results),
@@ -196,6 +197,7 @@ def eval_adversarial_chat(use_llm: bool) -> dict:
         "output_filter": {
             "claims_blocked": f"{sum(claims_blocked)}/{len(claims_blocked)}",
             "links_stripped": f"{sum(links_stripped)}/{len(links_stripped)}",
+            "ordinary_replies_kept": f"{sum(allowed_kept)}/{len(allowed_kept)}",
         },
     }
 
@@ -274,7 +276,7 @@ def main() -> None:
         print(f"Scripted conversations via {name:<6} {r['passed']}/{r['total']} records correct  misses {misses}")
     a = report["adversarial"]["chat"]
     print(
-        f"Adversarial chat ({a['path']}): {a['passed']}/{a['total']} passed  output filter: claims blocked {a['output_filter']['claims_blocked']}, links stripped {a['output_filter']['links_stripped']}"
+        f"Adversarial chat ({a['path']}): {a['passed']}/{a['total']} passed  output filter: claims blocked {a['output_filter']['claims_blocked']}, links stripped {a['output_filter']['links_stripped']}, ordinary replies kept {a['output_filter']['ordinary_replies_kept']}"
     )
     print(
         f"Adversarial OCR text: returned as inert text = {report['adversarial']['ocr']['address_returned_as_text_for_confirmation']}, sent to model = False"

@@ -79,6 +79,21 @@ def cancel(db: Session, user_id: str, booking_id: str) -> bool:
     return True
 
 
+def prune_off_hours_slots(db: Session) -> int:
+    """Delete open future slots outside 9:00-16:30 clinic time, e.g. ones made before slots used the
+    clinic's time zone. Booked slots are never touched. Returns how many were removed."""
+    zone = ZoneInfo(get_settings().clinic_timezone)
+    taken = select(Booking.slot_id)  # any booking, even cancelled, keeps its slot for the record
+    removed = 0
+    for slot in db.scalars(select(Slot).where(Slot.starts_at > datetime.now(UTC), Slot.id.not_in(taken))):
+        local = slot.starts_at.astimezone(zone)
+        if local.weekday() >= 5 or not time(9) <= local.time() <= time(16, 30) or local.minute % 30:
+            db.delete(slot)
+            removed += 1
+    db.commit()
+    return removed
+
+
 def seed_slots(db: Session, days: int = 14, start: datetime | None = None) -> int:
     """Make sure weekday slots exist for the next `days` days; returns how many were added.
 

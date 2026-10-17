@@ -56,23 +56,33 @@ _IN_PERSON = re.compile(r"\b(in[- ]person|in the clinic|come in|office visit)\b"
 _DURATION = re.compile(
     r"\b(?:for|since|about|past)\s+((?:a|an|one|two|three|four|five|six|\d+)\s+(?:day|week|month|year)s?|yesterday|last \w+)\b", re.I
 )
-# Links of any shape: schemes (including defanged hxxp), www., markdown links and images, and bare
-# domains such as evil.example/login. A stripped dotted word is a small price for never showing a link.
+# Links of any shape: schemes (including defanged hxxp), www., markdown links and images, bare
+# domains such as evil.example/login, defanged or full-width dots (evil[.]example, evil。example) and
+# bare IP addresses. The last label of a bare domain must be all lower or all upper case, so
+# "Dr.Smith" stays; a stripped dotted word is a small price for never showing a link.
+_DOT = r"(?:\.|\[\.\]|\(\.\)|\{\.\}|[\u3002\uff0e\uff61])"
 _URL = re.compile(
-    r"(\b(?:h[tx]{2}ps?|ftp)://\S+|\bwww\.\S+|!\[[^\]]*\]\([^)]*\)|\[[^\]]*\]\([^)]*\)|"
-    r"\b(?:[a-z0-9-]+\.)+[a-z]{2,24}\b(?:/\S*)?)",
+    r"(\b(?:h[tx]{2}ps?|ftp)://\S+|\bwww" + _DOT + r"\S+|!\[[^\]]*\]\([^)]*\)|\[[^\]]*\]\([^)]*\)|"
+    r"\b\d{1,3}(?:" + _DOT + r"\d{1,3}){3}(?::\d+)?(?:/\S*)?|"
+    r"\b(?:[a-z0-9-]+" + _DOT + r")+(?-i:[a-z]{2,24}|[A-Z]{2,24})\b(?:/\S*)?)",
     re.I,
 )
 # Any wording that claims an appointment was made, changed or cancelled. Only the scheduling API can do
 # that, so a reply matching this is replaced with a fixed one.
+_DONE = r"(?:booked|confirmed|scheduled|cancel+ed|moved|set|reserved|rescheduled|locked in|held|changed)"
 _COMMITMENT = re.compile(
     r"\b(?:i|we)(?:'ve| have| had|'ll| will|'m| am)?\s+(?:just\s+|now\s+|already\s+|(?:gone|went) ahead and\s+)?"
-    r"(?:booked|scheduled|confirmed|cancel+ed|rescheduled|reserved|moved|set up|put you|locked)\b|"
-    r"\b(?:went|gone) ahead and\b|"
+    r"(?:booked|scheduled|confirmed|cancel+ed|rescheduled|reserved|moved|set up|put you|locked|got you)\b|"
+    r"\b(?:went|gone) (?:ahead )?and\b|"
     r"\b(?:booked|scheduled|reserved|confirmed|rescheduled|moved) you\b|"
     r"\byou(?:'re|r| are)\s+(?:all\s+)?(?:set|booked|confirmed|scheduled)\b|"
-    r"\b(?:appointment|visit|booking|slot)\s+(?:is|has been|was|'s|is now|has now been)\s+(?:now\s+|all\s+)?"
-    r"(?:booked|confirmed|scheduled|cancel+ed|moved|set|reserved|rescheduled|locked in)\b|"
+    # "Your visit on Tuesday is confirmed", "The appointment for Tuesday is booked", "appointment's been moved"
+    r"\b(?:appointment|visit|booking|slot)s?\b[^.!?\n]{0,40}?(?:\b(?:is|are|has|have|was|were)\b|'s)\s+"
+    r"(?:now\s+|all\s+|been\s+|now been\s+|just been\s+)*" + _DONE + r"\b|"
+    r"\b(?:appointment|visit|booking|slot)s?\s*:?\s+" + _DONE + r"\b|"
+    r"\b(?:is|are|has been)\s+(?:now\s+)?(?:reserved|booked|held|saved|confirmed)\s+for you\b|"
+    r"\b(?:got|have|put|pencil+ed|marked|written) you (?:down|in)\b|"
+    r"\bconsider it (?:booked|done|scheduled|confirmed|sorted)\b|"
     r"(?:^|[.!]\s*)(?:booked|scheduled|confirmed|done)[!.,]?\s+(?:you|for|at|on)\b|"
     r"\bsee you (?:on |at |next |tomorrow|monday|tuesday|wednesday|thursday|friday|saturday|sunday)",
     re.I,
@@ -127,7 +137,11 @@ def trusted_history(turns: list[dict], user_id: str) -> list[dict]:
     for turn in turns:
         if turn.get("role") == "assistant":
             sig, content = turn.get("sig"), turn.get("content")
-            if not isinstance(sig, str) or not isinstance(content, str) or not hmac.compare_digest(sig, sign_reply(user_id, content)):
+            if (
+                not isinstance(sig, str)
+                or not isinstance(content, str)
+                or not hmac.compare_digest(sig.encode(), sign_reply(user_id, content).encode())
+            ):
                 continue
         kept.append({"role": turn.get("role"), "content": turn.get("content")})
     return kept

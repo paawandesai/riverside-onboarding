@@ -90,6 +90,9 @@ function Shell() {
 
   return (
     <>
+      <a href="#main" className="skip-link">
+        {t("header.skip")}
+      </a>
       <div className="banner" role="note">
         <strong>{t("banner.demo")}</strong> {t("banner.demoDetail")}
       </div>
@@ -134,7 +137,7 @@ function Shell() {
           )}
         </nav>
       </header>
-      <main id="main">
+      <main id="main" tabIndex={-1}>
         <div className="support-region" aria-live="polite">
           {support.card && <SupportCard content={support.card} onAction={support.act} onDismiss={support.dismiss} />}
         </div>

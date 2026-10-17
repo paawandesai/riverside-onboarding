@@ -149,7 +149,7 @@ def _rate(part: int, whole: int) -> float | None:
 
 @router.get("/analytics", response_model=AnalyticsOut)
 def analytics(
-    days: int = Query(default=7, ge=1, le=90), staff: User = Depends(require_staff), db: Session = Depends(get_db)
+    days: int = Query(default=7, ge=1, le=30), staff: User = Depends(require_staff), db: Session = Depends(get_db)
 ) -> AnalyticsOut:
     """Funnel drop-off, time per step and OCR correction rates. Counts only, no patient data.
 

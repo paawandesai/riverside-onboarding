@@ -118,8 +118,9 @@ def verify_model_at_startup() -> None:
     log_event(logger, "llm_model_verified", component="llm", model=settings.anthropic_model)
 
 
-_EMAIL = re.compile(r"\b[\w.+-]+@[\w-]+(?:\.[\w-]+)+\b")
-_PHONE = re.compile(r"(?<!\d)(?:\+?1[\s.-]?)?\(?\d{3}\)?[\s.-]?\d{3}[\s.-]?\d{4}(?!\d)")
+_EMAIL = re.compile(r"\b[\w.+-]+@[\w-]+(?:\.[\w-]+)*\b")
+# US numbers in any common layout, and international numbers written with a leading +.
+_PHONE = re.compile(r"(?<!\d)(?:\+?1[\s.-]?)?\(?\d{3}\)?[\s.-]?\d{3}[\s.-]?\d{4}(?!\d)|\+\d(?:[\s().-]{0,2}\d){6,14}(?!\d)")
 
 
 def redact(text: str) -> str:

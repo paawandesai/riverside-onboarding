@@ -90,7 +90,7 @@ def test_events_are_first_party_and_anonymous(client, db):
     from app.models import FunnelEvent
 
     r = client.post(
-        "/api/events", json={"anon_session_id": "6f1b8c1e-0b7a-4d0c-9a51-7d0f3b2f1a11", "step_id": "upload", "event": "started"}
+        "/api/events", json={"anon_session_id": "6f1b8c1e-0b7a-4d0c-9a51-7d0f3b2f1a11", "step_id": "chat", "event": "support_long_pause"}
     )
     assert r.status_code == 204
     assert (
@@ -99,6 +99,9 @@ def test_events_are_first_party_and_anonymous(client, db):
         ).status_code
         == 422
     )
+    for step, event in (("chat", "support_made_up"), ("not_a_step", "viewed"), ("chat", "started")):
+        r = client.post("/api/events", json={"anon_session_id": "6f1b8c1e-0b7a-4d0c-9a51-7d0f3b2f1a11", "step_id": step, "event": event})
+        assert r.status_code == 422
     assert db.query(FunnelEvent).count() == 1
 
 
@@ -154,3 +157,26 @@ def test_progress_reports_flags_only(user_client, slots):
     assert p == {"consent": True, "photo_scan": False, "assessment_done": False, "identity_done": False, "booked": False}
     user_client.post("/api/bookings", json={"slot_id": user_client.get("/api/slots").json()[0]["id"]})
     assert user_client.get("/api/progress").json()["booked"] is True
+
+
+def test_off_hours_slots_are_pruned_but_booked_ones_kept(db, slots):
+    from datetime import UTC, datetime, timedelta
+
+    from app.models import Booking, Slot, User
+    from app.services.scheduling import prune_off_hours_slots
+
+    # 05:00 clinic time (the old UTC-generated grid), one open and one booked.
+    day = datetime.now(UTC).replace(hour=10, minute=0, second=0, microsecond=0) + timedelta(days=8)
+    while day.weekday() >= 5:
+        day += timedelta(days=1)
+    open_early = Slot(starts_at=day, visit_type="in_person", clinician_label="x")
+    booked_early = Slot(starts_at=day + timedelta(minutes=30), visit_type="in_person", clinician_label="x")
+    user = User(email_lookup="k", email_enc=b"x", password_hash="x")
+    db.add_all([open_early, booked_early, user])
+    db.flush()
+    db.add(Booking(slot_id=booked_early.id, user_id=user.id, confirmation_code="ABCD1234"))
+    db.commit()
+    before = db.query(Slot).count()
+    assert prune_off_hours_slots(db) == 1
+    assert db.query(Slot).count() == before - 1
+    assert db.get(Slot, booked_early.id) is not None

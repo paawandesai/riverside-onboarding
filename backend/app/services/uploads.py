@@ -76,7 +76,7 @@ def validate_and_clean(data: bytes, max_bytes: int) -> CleanImage:
             rgb.thumbnail((WORK_SIDE, WORK_SIDE), Image.Resampling.LANCZOS)
     except UploadRejected:
         raise
-    except MemoryError as exc:
+    except (MemoryError, Image.DecompressionBombError) as exc:
         raise UploadRejected("That image is too large to process. Please upload a smaller photo.") from exc
     except Exception as exc:  # noqa: BLE001 - malformed files (odd EXIF, truncated data) must not become 500s
         raise UploadRejected("We couldn't read that image. It may be damaged. Please try another photo.") from exc

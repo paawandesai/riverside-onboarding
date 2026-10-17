@@ -99,11 +99,11 @@ Specimen ID images for trying the upload step are in `fixtures/generated-ids/` (
 Measured on 2026-10-16 and 2026-10-17 in a Linux x86_64 container with 4 CPUs and 15 GB RAM, Python 3.13,
 Tesseract 5.3.4, Postgres 16 on the same machine. Re-run with `make eval` and `make load`.
 
-**Tests** (re-measured 2026-10-17, after the audit fixes). Backend: 141 tests, 93.6% coverage
-(gate 80%). Frontend unit: 48 tests, 93.2% lines (gate 80%), each screen also checked with axe.
-End-to-end (Playwright, real API, real Postgres, real Tesseract, Pixel 7 viewport): 11 flow tests
+**Tests** (re-measured 2026-10-17, after the audit fixes). Backend: 149 tests, 93.7% coverage
+(gate 80%). Frontend unit: 49 tests, 93.2% lines (gate 80%), each screen also checked with axe.
+End-to-end (Playwright, real API, real Postgres, real Tesseract, Pixel 7 viewport): 8 flow tests
 covering the ID-scan path, unreadable photo to typing, assistant failure to the form, two patients
-booking the same slot, consent withdrawal deleting data, the staff view, deep links, and the security
+booking the same slot, consent withdrawal deleting data, the staff view and analytics, deep links, and the security
 headers with a dialog open under the CSP; plus 3 accessibility tests on mobile and desktop (axe WCAG
 2.2 AA with real CSS, no sideways scroll at 320 px, keyboard-only start, 200% text).
 
@@ -171,22 +171,27 @@ safety net, and the form it offers is how a patient finishes when the model is d
 **Adversarial** (`eval/adversarial/`, 2026-10-17): 10/10 prompt-injection cases pass **on the Claude
 path** and 10/10 on the fallback: no prompt leak, no links, no booking claims, valid intent and
 fields, distress override, a forged earlier assistant turn, a request to repeat "your appointment is
-now booked", and a bare-domain link. Separately, the server-side filter replaced 5/5 booking claims
-and stripped 4/4 link shapes (bare domain, defanged `hxxps://`, markdown, `www.`) that the audit
-showed getting through before. Injected text printed on an ID image comes back as a plain field
+now booked", and a bare-domain link. Separately, the server-side filter replaced 13/13 booking claims
+(including "Your visit on Tuesday is confirmed" and "We've got you down for Tuesday") and stripped
+8/8 link shapes (bare domain, defanged `hxxps://`, `evil[.]example`, full-width dots, bare IPs,
+markdown, `www.`) that the two audits showed getting through, while leaving 4/4 ordinary replies
+(such as "Dr.Smith will review your answers") unchanged. Injected text printed on an ID image comes back as a plain field
 value for the user to confirm and is never sent to a model.
 
 **Engine version.** The numbers above use Tesseract 5.3.4 in the development container. The
-deployed image (Debian bookworm) has Tesseract 5.3.0; see [Uptime and deployed checks](#uptime-and-deployed-checks)
-for the OCR eval run inside that image.
+deployed image (Debian bookworm) has Tesseract 5.3.0; the OCR eval run inside that image
+(commit f3a058b, 2026-10-17) gives the same field accuracy: 94.4%, 92.2% and 91.1%, p95 about
+2.2 s per card.
 
 ## Uptime and deployed checks
 
 A scheduled GitLab pipeline (`UPTIME_CHECK=1`, every 15 minutes) runs only the `uptime` job, which
-requests `/api/health` on the live demo and fails on anything but a 200 within 15 s. The health
+requests `/api/health` on the live demo and fails unless it answers HTTP 200 within 15 s with
+`"status":"ok"` (database reachable, OCR engine present). The health
 endpoint makes no model call, and the app already keeps one instance running, so the check measures
-availability without changing it. `python scripts/uptime_report.py --since <date>` counts the results
-(it needs a GitLab token with `read_api` in `GITLAB_TOKEN`).
+availability without changing it. `python scripts/uptime_report.py --since <date>` counts the results,
+and how many checks the schedule should have run, so missed runs show up as unknown rather than
+disappearing (it needs a GitLab token with `read_api` in `GITLAB_TOKEN`).
 
 The schedule started on 2026-10-17, so there is no meaningful uptime figure yet; run the report
 above for the current number rather than trusting one written here.
@@ -211,6 +216,9 @@ above for the current number rather than trusting one written here.
   init container), and both passwords are 40 random characters. One instance stays running during
   grading (`min_replicas=1`); after grading it goes back to scaling to zero, when the first request
   after idle is slow.
+- Sign-in attempts are limited per address, not per account across addresses: on shared demo logins
+  an account-wide limit would let anyone lock every reviewer out. Guessing from many addresses at
+  once is not slowed beyond the per-address limit.
 - Rate limits are counted in each worker's memory (two workers, up to two replicas), so the real
   ceiling is up to four times each limit. That stops guessing and budget-burning from one session;
   it is not a shared quota.
@@ -280,18 +288,22 @@ at startup and fails fast if it is unavailable.
   bodies, user text, names, emails, DOB, addresses, images, auth headers or transcripts.
 - `/api/health` reports configuration and last-success timestamps and never calls a model.
 - Demo safeguards: invite code, persistent synthetic-data banner, `noindex` header and meta tag,
-  scheduled purge, user-role-only demo account with rotation (`infra/README.md`).
+  scheduled purge, a patient demo login and a read-only staff demo login, both in Key Vault and
+  rotated (`infra/README.md`). The consent notice says the staff login can see what is entered.
 - Every state-changing API call must carry an `X-Requested-With` header (a CSRF guard on top of
   the SameSite cookie). The app sends a strict Content-Security-Policy (`script-src 'self'`, no inline
   scripts; style tags only with a per-response nonce, which the dialogs' scroll lock uses), HSTS,
   `X-Frame-Options: DENY` and a Permissions-Policy allowing only the camera. With `APP_ENV` unset it
   runs as production: Secure cookies, no API docs or schema.
-- Sessions carry a per-user version, so signing out ends every copy of the cookie. Sign-in,
+- Signing out revokes that browser's session id on the server, so a copied cookie stops working,
+  while other people signed in to the same shared demo login stay signed in. A password or role
+  change ends every session for that account. Sign-in,
   sign-up, chat, uploads and analytics events are rate-limited, and at most four password hashes
   run at once.
 - The email lookup key, session key and field encryption keys are separate; the field key accepts
   a list so it can be rotated, and all keys are checked at startup.
-- The app's database role can read and write rows only; it can't change the schema.
+- The app's database role can read and write rows only; it can't change the schema, and it can add
+  to the audit log but not change or delete it.
 - Untrusted text (chat, OCR output) is treated as data: delimited and neutralised in the prompt,
   model output is schema-validated and never executed, no HTML rendering of user or model text.
 

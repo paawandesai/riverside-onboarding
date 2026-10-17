@@ -44,9 +44,11 @@ variable "anthropic_model" {
 }
 
 variable "credentials_version" {
-  description = "Bump to rotate the DB password, session secret, invite code and demo password (e.g. after grading)."
+  # Keep this equal to the live value: a plain deploy with a lower or higher number rotates every
+  # credential. Bump it here (and commit) to rotate.
+  description = "Bump to rotate the DB passwords, session secret, invite code and demo passwords (e.g. after grading)."
   type        = number
-  default     = 1
+  default     = 2
 }
 
 variable "demo_user_email" {

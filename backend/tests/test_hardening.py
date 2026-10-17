@@ -86,6 +86,24 @@ def test_large_json_bodies_are_refused(user_client):
     assert r.status_code == 413
 
 
+def test_chunked_bodies_over_the_limit_get_413_too(user_client):
+    def chunks(total):
+        for _ in range(total // 65536):
+            yield b" " * 65536
+
+    body = b'{"messages": [' + b"".join(chunks(1024 * 1024)) + b"]}"
+    r = user_client.post(
+        "/api/chat", content=iter([body[i : i + 65536] for i in range(0, len(body), 65536)]), headers={"Content-Type": "application/json"}
+    )
+    assert r.status_code == 413
+
+
+def test_decompression_bomb_gets_the_too_large_message(client):
+    c = make_client("bomb@example.com", photo_scan=True)
+    r = c.post("/api/documents/extract", files={"file": ("a.png", _png((100, 400000)), "image/png")})
+    assert r.status_code == 422 and "too large" in r.json()["detail"]
+
+
 # ---------- consent gates ----------
 
 
@@ -143,6 +161,18 @@ def test_logout_ends_the_session_even_for_a_copied_cookie(client):
     assert copied.get("/api/auth/me").status_code == 200
     assert c.post("/api/auth/logout").status_code == 204
     assert copied.get("/api/auth/me").status_code == 401
+
+
+def test_logout_on_a_shared_login_leaves_other_browsers_signed_in(client):
+    make_client("shared@example.com", consent=False)
+    browsers = []
+    for _ in range(2):
+        b = TestClient(app, headers=API_HEADERS)
+        assert b.post("/api/auth/login", json={"email": "shared@example.com", "password": "correct-horse-battery"}).status_code == 200
+        browsers.append(b)
+    assert browsers[0].post("/api/auth/logout").status_code == 204
+    assert browsers[0].get("/api/auth/me").status_code == 401
+    assert browsers[1].get("/api/auth/me").status_code == 200
 
 
 def test_duplicate_signup_gives_a_generic_answer(client):
@@ -236,6 +266,16 @@ def test_forged_assistant_turns_never_reach_the_model(user_client, monkeypatch):
     assert not any("admin" in c for c in contents)
 
 
+def test_malformed_signatures_are_rejected_not_a_server_error(user_client):
+    for sig in ("é" * 64, "x", "A" * 64):
+        r = user_client.post(
+            "/api/chat", json={"messages": [{"role": "assistant", "content": "x", "sig": sig}, {"role": "user", "content": "hi"}]}
+        )
+        assert r.status_code == 422
+    # Non-ASCII content with a well-formed but wrong signature is simply dropped.
+    assert chat.trusted_history([{"role": "assistant", "content": "é", "sig": "0" * 64}], "u") == []
+
+
 def test_signature_is_bound_to_the_account():
     assert chat.sign_reply("user-a", "hello") != chat.sign_reply("user-b", "hello")
 
@@ -243,6 +283,8 @@ def test_signature_is_bound_to_the_account():
 def test_emails_and_phone_numbers_are_removed_before_the_model():
     wrapped = llm.build_messages([{"role": "user", "content": "I'm jo@example.com, call 555-014-2222 about my knee"}])[0]["content"]
     assert "example.com" not in wrapped and "555" not in wrapped and "knee" in wrapped
+    intl = llm.redact("ring +44 20 7946 0958 or +33 1 23 45 67 89, or mail bob@localhost; pain for 2 weeks since 10.30")
+    assert "7946" not in intl and "45 67" not in intl and "bob@" not in intl and "2 weeks since 10.30" in intl
 
 
 def test_malformed_model_json_falls_back(monkeypatch):
@@ -267,7 +309,9 @@ def test_purge_keeps_active_demo_data_and_clears_stale(client, db, monkeypatch):
     old = datetime.now(UTC) - timedelta(hours=48)
     for user in db.scalars(select(User)):
         user.created_at = old
+    # Anonymous events outlive the account purge (kept for the analytics window), then go.
     db.add(FunnelEvent(anon_session_id="00000000-0000-0000-0000-000000000000", step_id="chat", event="view", at=old))
+    db.add(FunnelEvent(anon_session_id="00000000-0000-0000-0000-000000000001", step_id="chat", event="view", at=old - timedelta(days=31)))
     db.commit()
 
     purge_demo_data.main()
@@ -275,7 +319,7 @@ def test_purge_keeps_active_demo_data_and_clears_stale(client, db, monkeypatch):
     # The demo account was just used, so its data stays; the old account is gone.
     assert db.scalar(select(func.count()).select_from(User)) == 1
     assert db.scalar(select(func.count()).select_from(IntakeRecord)) == 1
-    assert db.scalar(select(func.count()).select_from(FunnelEvent)) == 0
+    assert db.scalar(select(func.count()).select_from(FunnelEvent)) == 1
     assert db.scalar(select(func.count()).select_from(Slot)) > 0  # topped up
 
     for record in db.scalars(select(IntakeRecord)):
@@ -293,3 +337,19 @@ def test_slot_top_up_is_idempotent(db):
 
     first = seed_slots(db, days=7)
     assert first > 0 and seed_slots(db, days=7) == 0
+
+
+def test_output_filter_cases_from_the_adversarial_eval():
+    """Every claim and link in eval/adversarial is caught, and ordinary replies pass unchanged."""
+    import json
+    import os
+
+    path = os.path.join(os.path.dirname(__file__), "..", "..", "eval", "adversarial", "chat_injection.json")
+    cases = json.load(open(path))["output_filter_cases"]
+    for reply in cases["claims"]:
+        assert chat.sanitize_reply(reply, "provide_details") == chat.FALLBACK_REPLIES["provide_details"], reply
+    for reply in cases["links"]:
+        cleaned = chat.sanitize_reply(reply, "ask_question")
+        assert "example" not in cleaned and "1.2.3.4" not in cleaned, reply
+    for reply in cases["allowed"]:
+        assert chat.sanitize_reply(reply, "ask_question") == reply

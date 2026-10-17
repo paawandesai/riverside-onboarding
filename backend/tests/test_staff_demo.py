@@ -117,3 +117,15 @@ def test_upsert_account_rotates_password_and_role(db, client):
     assert user.session_version == 1
     ok = client.post("/api/auth/login", json={"email": "rotate@example.com", "password": "second-password-2"})
     assert ok.status_code == 200 and ok.json()["role"] == "staff"
+
+
+def test_staff_accounts_cannot_consent_or_book(db, slots):
+    staff = staff_client(db, "booking-staff@example.com")
+    assert staff.post("/api/consent", json={"photo_scan": False}).status_code == 403
+    slot = staff.get("/api/slots").json()[0]
+    assert staff.post("/api/bookings", json={"slot_id": slot["id"]}).status_code == 403
+
+
+def test_consent_notice_says_demo_staff_can_see_entries(client):
+    points = client.get("/api/consent/text").json()["points"]
+    assert any("staff login" in p for p in points)

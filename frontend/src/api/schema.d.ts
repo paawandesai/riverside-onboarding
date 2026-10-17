@@ -32,7 +32,8 @@ export interface paths {
         put?: never;
         /**
          * Logout
-         * @description Sign out everywhere: tokens issued before now stop working, not just this browser's cookie.
+         * @description Sign out this browser: its session id is revoked server-side, so a copy of the cookie stops
+         *     working too. Other sign-ins to the same account (shared demo logins) are not affected.
          */
         post: operations["logout_api_auth_logout_post"];
         delete?: never;

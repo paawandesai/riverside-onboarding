@@ -42,7 +42,11 @@ def _schema():
 def _clean_tables():
     engine = get_engine()
     with engine.begin() as conn:
-        conn.execute(text("TRUNCATE users, consents, intake_records, bookings, slots, audit_log, funnel_events RESTART IDENTITY CASCADE"))
+        conn.execute(
+            text(
+                "TRUNCATE users, consents, intake_records, bookings, slots, audit_log, funnel_events, revoked_sessions RESTART IDENTITY CASCADE"
+            )
+        )
     yield
 
 

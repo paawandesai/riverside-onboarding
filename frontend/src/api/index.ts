@@ -26,6 +26,8 @@ export type Analytics = Schemas["AnalyticsOut"];
 
 // The assistant has 6 s on the server and falls back to rules; 15 s here covers a slow network.
 export const CHAT_TIMEOUT_MS = 15_000;
+// Matches the server's history window (ChatIn.messages max_length).
+export const CHAT_HISTORY_TURNS = 20;
 
 export const api = {
   me: () => request<Me>("GET", "/api/auth/me"),

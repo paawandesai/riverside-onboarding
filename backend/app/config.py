@@ -20,6 +20,9 @@ class Settings(BaseSettings):
     cors_origins: str = "http://localhost:5173"
     demo_mode: bool = True
     demo_retention_hours: int = 24
+    # Funnel events are anonymous (no account, no values), so they outlive the demo's 24-hour purge
+    # long enough for the staff analytics windows.
+    analytics_retention_days: int = 30
     # Appointment times are generated in the clinic's own zone and shown with its name.
     clinic_timezone: str = "America/New_York"
 

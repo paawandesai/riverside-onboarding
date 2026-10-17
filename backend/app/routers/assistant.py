@@ -21,11 +21,13 @@ class ChatTurn(BaseModel):
     role: str = Field(pattern="^(user|assistant)$")
     content: str = Field(max_length=4000)
     # Assistant turns carry the signature the server returned with them; unsigned ones are dropped.
-    sig: str | None = Field(default=None, max_length=128)
+    sig: str | None = Field(default=None, pattern="^[0-9a-f]{64}$")
 
 
 class ChatIn(BaseModel):
-    messages: list[ChatTurn] = Field(min_length=1, max_length=60)
+    # The browser sends the last 20 turns (chat.MAX_TURNS); 20 x 4000 characters stays under the
+    # 512 KB JSON limit even in 4-byte scripts.
+    messages: list[ChatTurn] = Field(min_length=1, max_length=20)
 
 
 class SupportActionOut(BaseModel):
@@ -96,6 +98,15 @@ def evaluate_support(body: SignalsIn) -> dict:
     return {"content": content}
 
 
+# Only the steps and events the app itself sends, so anonymous callers can't invent rows that show up
+# on the staff analytics page.
+EVENT_STEPS = {
+    "start", "account", "consent", "chat", "details", "confirm", "book", "done", "privacy", "saved", "deleted",
+    "front_desk", "staff", "staff_analytics", "staff_patient", "other",
+}  # fmt: skip
+EVENT_NAMES = {"viewed"} | {f"support_{trigger}" for trigger in support.TRIGGER_PRIORITY}
+
+
 class EventIn(BaseModel):
     anon_session_id: uuid.UUID
     step_id: str = Field(pattern="^[a-z_]{2,32}$")
@@ -105,5 +116,7 @@ class EventIn(BaseModel):
 @router.post("/events", status_code=204, dependencies=[Depends(per_ip("events", 120, 60))])
 def record_event(body: EventIn, db: Session = Depends(get_db)) -> None:
     """First-party funnel analytics: anonymous session id, step and event name only."""
+    if body.step_id not in EVENT_STEPS or body.event not in EVENT_NAMES:
+        raise HTTPException(status_code=422, detail="Unknown step or event.")
     db.add(FunnelEvent(anon_session_id=str(body.anon_session_id), step_id=body.step_id, event=body.event))
     db.commit()

@@ -5,7 +5,7 @@ Runs hourly as a scheduled job (see infra/terraform):
 * the shared demo account is kept, and its data is cleared only once nobody has touched it for
   DEMO_RETENTION_HOURS, so a reviewer partway through the flow doesn't lose it;
 * the staff login and the made-up sample patients are kept;
-* anonymous funnel events past the window are deleted;
+* anonymous funnel events older than ANALYTICS_RETENTION_DAYS are deleted;
 * appointment slots are topped up so the next two weeks always have open times, and sample
   patients whose visit has passed get a new one (when DEMO_SAMPLE_PATIENTS is set).
 The audit log (ids and action names only) is kept.
@@ -18,11 +18,11 @@ from sqlalchemy import delete, func, select
 
 from app.config import get_settings
 from app.db import get_db
-from app.models import Booking, Consent, FunnelEvent, IntakeRecord, User
-from app.security import email_lookup_key
+from app.models import Booking, Consent, FunnelEvent, IntakeRecord, RevokedSession, User
+from app.security import SESSION_MAX_AGE_SECONDS, email_lookup_key
 from app.services.demo import seed_sample_patients
 from app.services.privacy import delete_account, purge_user_data
-from app.services.scheduling import seed_slots
+from app.services.scheduling import prune_off_hours_slots, seed_slots
 
 
 def last_activity(db, user_id: str) -> datetime | None:
@@ -52,13 +52,18 @@ def main() -> None:
         elif user.created_at < cutoff:
             delete_account(db, user.id)
             deleted += 1
-    events = db.execute(delete(FunnelEvent).where(FunnelEvent.at < cutoff)).rowcount
+    events_cutoff = datetime.now(UTC) - timedelta(days=settings.analytics_retention_days)
+    events = db.execute(delete(FunnelEvent).where(FunnelEvent.at < events_cutoff)).rowcount
+    # A revoked session id only matters until the token would have expired anyway.
+    session_cutoff = datetime.now(UTC) - timedelta(seconds=SESSION_MAX_AGE_SECONDS)
+    db.execute(delete(RevokedSession).where(RevokedSession.revoked_at < session_cutoff))
     db.commit()
+    pruned = prune_off_hours_slots(db)
     added = seed_slots(db, days=14)
     rebooked = seed_sample_patients(db) if os.environ.get("DEMO_SAMPLE_PATIENTS") else 0
     print(
         f"deleted {deleted} accounts, cleared the demo account {cleared}x, removed {events} events, "
-        f"added {added} slots, rebooked {rebooked} sample visits"
+        f"removed {pruned} off-hours slots, added {added} slots, rebooked {rebooked} sample visits"
     )
 
 

@@ -44,16 +44,21 @@ The image tag is the current commit, so the working tree must be clean. Without
 
 ## Rotating credentials
 
-`infra/deploy.sh -auto-approve -var credentials_version=N` (one higher than the last value; the
-demo was last rotated to 2) issues new demo patient and staff passwords, invite code, session secret and both DB
+Raise the default of `credentials_version` in `infra/terraform/variables.tf` by one, commit, and run
+`infra/deploy.sh -auto-approve` (the default is kept equal to the live value, 2 today, so a plain
+deploy never rotates by accident). That issues new demo patient and staff passwords, invite code, session secret and both DB
 passwords. The app sets `CREDENTIALS_VERSION` from it, so the change rolls a new revision that
 reads the new values; the init container updates the app role's password and the seed step updates
 the demo user's password and signs out its sessions. Existing patient sessions end because the
-session secret changes. Between the first and last step of the deploy the old revision can't reach
-the database for a few minutes, because the admin password changes first.
+session secret changes. Expect a short outage during the deploy: once the new revision's init
+container changes the app role's password, the old revision can't reach the database until traffic
+moves to the new one, and an old-revision replica that restarts in between fails its init container
+(the admin password has already changed). Both clear when the new revision is live.
 
 The email lookup key and the field encryption key are not rotated this way: changing them would
-make existing accounts unfindable or existing rows unreadable. `FIELD_ENCRYPTION_KEY` accepts a
+make existing accounts unfindable or existing rows unreadable. (Introducing the separate email key
+on 2026-10-17 did exactly that once: accounts made before it could no longer sign in, and the purge
+removed them; the demo logins were recreated by the seed step.) `FIELD_ENCRYPTION_KEY` accepts a
 comma-separated list (new key first) for a planned rotation.
 
 To read the current demo values without printing them anywhere else (you need the Key Vault

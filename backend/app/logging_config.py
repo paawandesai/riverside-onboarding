@@ -57,6 +57,12 @@ def configure_logging() -> None:
     root.setLevel(logging.INFO)
     # Access logs include query strings; our middleware logs requests instead.
     logging.getLogger("uvicorn.access").disabled = True
+    # Uvicorn installs its own plain-text handlers; send its server messages through the same
+    # allow-list formatter (only the fixed message template is kept, never its arguments).
+    for name in ("uvicorn", "uvicorn.error"):
+        server_logger = logging.getLogger(name)
+        server_logger.handlers = [handler]
+        server_logger.propagate = False
 
 
 def log_event(logger: logging.Logger, event: str, level: int = logging.INFO, **fields) -> None:

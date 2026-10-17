@@ -2,7 +2,7 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Bot, Send } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router";
-import { api, ApiError, type AssessmentFields, type ChatTurn } from "../api";
+import { api, ApiError, type AssessmentFields, CHAT_HISTORY_TURNS, type ChatTurn } from "../api";
 import { useDraft } from "../app/draft";
 import { useSupport, useSupportActions } from "../app/support";
 import { StepPage } from "../components/StepPage";
@@ -69,7 +69,8 @@ export function Chat() {
     setFailure(null);
     abort.current = new AbortController();
     try {
-      const result = await api.chat(turns, abort.current.signal);
+      // The server only reads the last 20 turns; sending just those keeps long chats under the body limit.
+      const result = await api.chat(turns.slice(-CHAT_HISTORY_TURNS), abort.current.signal);
       // The signature lets the server check this reply really came from it when the history is sent back.
       draft.setTranscript([...turns, { role: "assistant", content: result.reply, sig: result.reply_sig }]);
       draft.setFields(mergeFields(draft.fields, result.fields));

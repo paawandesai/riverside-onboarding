@@ -16,11 +16,11 @@ from app.security import (
     current_user,
     email_lookup_key,
     encrypt_str,
-    end_sessions,
     hash_password,
     make_session_token,
     needs_rehash,
     read_session_token,
+    revoke_session,
     verify_password,
 )
 
@@ -92,7 +92,9 @@ def signup(body: SignupIn, response: Response, db: Session = Depends(get_db)) ->
 
 @router.post("/login", response_model=MeOut, dependencies=[Depends(per_ip("login", 20, 60))])
 def login(body: LoginIn, request: Request, response: Response, db: Session = Depends(get_db)) -> MeOut:
-    # Per address and per account, so guessing one password and spraying many accounts are both slowed.
+    # Per address, and per address and account, so a single source guessing passwords is slowed. There
+    # is no account-wide limit across addresses: on shared demo logins anyone could use it to lock
+    # everyone out. Guessing from many addresses is a known gap (README, Known constraints).
     check("login-account", f"{client_ip(request)}:{email_lookup_key(body.email)}", 5, 60)
     user = db.scalar(select(User).where(User.email_lookup == email_lookup_key(body.email)))
     # Unknown emails still pay for a hash, so response time doesn't reveal which accounts exist.
@@ -107,12 +109,12 @@ def login(body: LoginIn, request: Request, response: Response, db: Session = Dep
 
 @router.post("/logout", status_code=204)
 def logout(request: Request, response: Response, db: Session = Depends(get_db)) -> None:
-    """Sign out everywhere: tokens issued before now stop working, not just this browser's cookie."""
+    """Sign out this browser: its session id is revoked server-side, so a copy of the cookie stops
+    working too. Other sign-ins to the same account (shared demo logins) are not affected."""
     token = request.cookies.get(SESSION_COOKIE)
     session = read_session_token(token) if token else None
-    user = db.get(User, session[0]) if session else None
-    if user is not None and user.session_version == session[1]:
-        end_sessions(user)
+    if session is not None:
+        revoke_session(db, session[2])
         db.commit()
     response.delete_cookie(SESSION_COOKIE, path="/")
 

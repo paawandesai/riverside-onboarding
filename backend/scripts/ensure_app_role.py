@@ -6,7 +6,8 @@ container, so the app itself never holds admin credentials:
     APP_DATABASE_URL=postgresql+pg8000://onboarding_app:<password>@host/db python -m scripts.ensure_app_role
 
 The role can read and write rows in the app's tables and nothing else: it cannot create, alter or
-drop tables, and has no other database rights. The password is sent as a SCRAM verifier, so the
+drop tables, can only add to the audit log (not change or delete it), can't touch alembic_version,
+and has no other database rights. The password is sent as a SCRAM verifier, so the
 server never sees it in clear text (not even in a statement log).
 """
 
@@ -47,6 +48,13 @@ def statements(role: str, password: str, database: str) -> list[str]:
         # Tables added by later migrations (created by the admin) get the same rights.
         f"ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO {role}",
         f"ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT USAGE, SELECT ON SEQUENCES TO {role}",
+        # The audit trail is append-only for the app, and the migration bookkeeping isn't its business.
+        f"REVOKE UPDATE, DELETE, TRUNCATE ON audit_log FROM {role}",
+        f"""DO $$ BEGIN
+              IF to_regclass('public.alembic_version') IS NOT NULL THEN
+                EXECUTE 'REVOKE ALL ON alembic_version FROM {role}';
+              END IF;
+            END $$""",
     ]
 
 

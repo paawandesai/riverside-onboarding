@@ -6,7 +6,7 @@ from sqlalchemy.orm import Session
 from app.models import Booking, Consent, IntakeRecord, User
 from app.security import audit
 
-CONSENT_VERSION = "2026-10-v3"
+CONSENT_VERSION = "2026-10-v4"
 
 # Layered notice: short points first, the full notice behind "Read the full privacy notice".
 CONSENT_TEXT = {
@@ -17,6 +17,7 @@ CONSENT_TEXT = {
         "What you type in the chat is processed by Anthropic's Claude. Anthropic keeps it up to 30 days, or up to 2 years if their safety systems flag it. Please don't type your name, date of birth or address there.",
         "ID photos are read on our own servers, never sent to an AI service, and discarded straight away. We never store them.",
         "Our care team reviews your answers. The assistant doesn't diagnose or decide your care.",
+        "This is a public demo: reviewers with the shared staff login can see everything you enter here.",
         "You can withdraw and delete your information at any time from the menu.",
     ],
     "photo_scan": "Let me scan my ID. Optional. Saves typing. You can say no and type instead.",
@@ -30,7 +31,8 @@ CONSENT_TEXT = {
         "If you choose to scan your ID, the photo is processed in memory on our servers to fill in the form and then discarded. It is never written to disk or stored, and never sent to any AI provider.",
         "Your details are encrypted in our database. Our logs never contain your name, date of birth, address, email, messages or photos.",
         "Withdrawing consent stops processing and deletes your details, answers and booking from our systems. Deleting your data also withdraws consent, so you would be asked again before continuing. You can also delete your whole account.",
-        "This is a demo with synthetic data only. Do not enter real personal or health information.",
+        "This is a demo with synthetic data only. Do not enter real personal or health information. "
+        "The demo has a shared, read-only staff login for reviewers, and anyone using it can see the details, answers and bookings of every account.",
     ],
 }
 

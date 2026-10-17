@@ -33,6 +33,15 @@ class User(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
 
 
+class RevokedSession(Base):
+    """Session ids signed out before they expire. Rows older than the session lifetime are purged."""
+
+    __tablename__ = "revoked_sessions"
+
+    sid: Mapped[str] = mapped_column(String(32), primary_key=True)
+    revoked_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now, index=True)
+
+
 class Consent(Base):
     __tablename__ = "consents"
 

@@ -61,18 +61,27 @@ class BodyLimitMiddleware:
 
         seen = 0
         started = False
+        exceeded = False
 
         async def counted_receive() -> Message:
-            nonlocal seen
+            nonlocal seen, exceeded
             message = await receive()
             if message["type"] == "http.request":
                 seen += len(message.get("body", b""))
                 if seen > limit:
+                    exceeded = True
                     raise BodyTooLarge()
             return message
 
         async def tracked_send(message: Message) -> None:
             nonlocal started
+            if exceeded:
+                # A handler caught BodyTooLarge (form and JSON parsers wrap it in a 400 or 422);
+                # answer with the 413 it stands for instead.
+                if message["type"] == "http.response.start" and not started:
+                    started = True
+                    await _too_large(send)
+                return
             if message["type"] == "http.response.start":
                 started = True
             await send(message)

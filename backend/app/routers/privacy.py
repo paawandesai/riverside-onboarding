@@ -44,6 +44,9 @@ def consent_status(user: User = Depends(current_user), db: Session = Depends(get
 @router.post("/consent", response_model=ConsentOut, status_code=201)
 def grant_consent(body: ConsentIn | None = None, user: User = Depends(current_user), db: Session = Depends(get_db)) -> ConsentOut:
     """Grant consent from the consent notice (or re-confirm it with a different photo choice)."""
+    if user.role != "user":
+        # Staff accounts review intakes; they don't go through intake themselves (and are never purged).
+        raise HTTPException(status_code=403, detail="Staff accounts can't start an intake.")
     photo_scan = body.photo_scan if body else False
     consent = active_consent(db, user.id)
     if consent is None:

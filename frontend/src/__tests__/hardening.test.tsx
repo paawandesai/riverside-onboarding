@@ -148,3 +148,11 @@ test("sign-up says what's stored before consent and links the notice", async () 
   await userEvent.click(notice);
   expect(within(notice.closest("details")!).getByText("Point one")).toBeVisible();
 });
+
+test("a skip link leads keyboard users past the header to the main content", async () => {
+  mockFetch({ "GET /api/auth/me": { status: 401, body: { detail: "Please sign in." } } });
+  renderApp("/");
+  const skip = await screen.findByRole("link", { name: "Skip to main content" });
+  expect(skip).toHaveAttribute("href", "#main");
+  expect(document.getElementById("main")).toHaveAttribute("tabindex", "-1");
+});

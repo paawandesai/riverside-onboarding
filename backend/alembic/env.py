@@ -66,6 +66,9 @@ def run_migrations_online() -> None:
         context.configure(connection=connection, target_metadata=target_metadata)
 
         with context.begin_transaction():
+            # Replicas starting together each run migrations; a transaction-level advisory lock makes
+            # the second wait, then find nothing left to do.
+            connection.exec_driver_sql("SELECT pg_advisory_xact_lock(7243100917)")
             context.run_migrations()
 
 

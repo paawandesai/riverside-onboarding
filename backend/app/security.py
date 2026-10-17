@@ -2,6 +2,7 @@ import hashlib
 import hmac
 import json
 import logging
+import secrets
 import threading
 from datetime import UTC, datetime
 from functools import lru_cache
@@ -16,7 +17,7 @@ from sqlalchemy.orm import Session
 from app.config import get_settings
 from app.db import get_db
 from app.logging_config import log_event
-from app.models import AuditLog, User
+from app.models import AuditLog, RevokedSession, User
 
 logger = logging.getLogger("app.security")
 
@@ -28,8 +29,19 @@ _hasher = PasswordHasher()
 _HASH_SLOTS = threading.BoundedSemaphore(4)
 
 
+class _HashSlot:
+    """A hashing slot, or a 503 after a short wait, so a login flood can't tie up every worker thread."""
+
+    def __enter__(self):
+        if not _HASH_SLOTS.acquire(timeout=10):
+            raise HTTPException(status_code=503, detail="We're busy right now. Please try again in a moment.")
+
+    def __exit__(self, *exc):
+        _HASH_SLOTS.release()
+
+
 def hash_password(password: str) -> str:
-    with _HASH_SLOTS:
+    with _HashSlot():
         return _hasher.hash(password)
 
 
@@ -41,7 +53,7 @@ def _dummy_hash() -> str:
 def verify_password(password_hash: str | None, password: str) -> bool:
     """Check a password. With no hash (unknown email) it still does the work, so timing doesn't reveal accounts."""
     target = password_hash or _dummy_hash()
-    with _HASH_SLOTS:
+    with _HashSlot():
         try:
             ok = _hasher.verify(target, password)
         except (VerifyMismatchError, VerificationError, InvalidHashError):
@@ -105,29 +117,38 @@ def _serializer() -> URLSafeTimedSerializer:
 
 
 def make_session_token(user: User) -> str:
-    return _serializer().dumps({"uid": user.id, "sv": user.session_version})
+    # sid identifies this one sign-in, so signing out ends it without touching other browsers.
+    return _serializer().dumps({"uid": user.id, "sv": user.session_version, "sid": secrets.token_hex(16)})
 
 
-def read_session_token(token: str) -> tuple[str, int] | None:
+def read_session_token(token: str) -> tuple[str, int, str] | None:
     try:
         data = _serializer().loads(token, max_age=SESSION_MAX_AGE_SECONDS)
     except (BadSignature, SignatureExpired):
         return None
     if not isinstance(data, dict) or not isinstance(data.get("uid"), str) or not isinstance(data.get("sv"), int):
         return None
-    return data["uid"], data["sv"]
+    if not isinstance(data.get("sid"), str) or len(data["sid"]) != 32:
+        return None
+    return data["uid"], data["sv"], data["sid"]
 
 
 def end_sessions(user: User) -> None:
-    """Invalidate every session token issued to this user so far (sign-out, withdrawal, rotation)."""
+    """Invalidate every session token issued to this user so far (password or role change)."""
     user.session_version = (user.session_version or 0) + 1
+
+
+def revoke_session(db: Session, sid: str) -> None:
+    """End one sign-in (this browser). Shared demo logins stay signed in elsewhere."""
+    if db.get(RevokedSession, sid) is None:
+        db.add(RevokedSession(sid=sid))
 
 
 def current_user(request: Request, db: Session = Depends(get_db)) -> User:
     token = request.cookies.get(SESSION_COOKIE)
     session = read_session_token(token) if token else None
     user = db.get(User, session[0]) if session else None
-    if user is None or session is None or user.session_version != session[1]:
+    if user is None or session is None or user.session_version != session[1] or db.get(RevokedSession, session[2]):
         raise HTTPException(status_code=401, detail="Please sign in.")
     request.state.user_id = user.id
     return user

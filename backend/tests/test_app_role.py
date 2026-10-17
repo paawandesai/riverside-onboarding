@@ -29,6 +29,12 @@ def test_app_role_has_row_access_only(can_create_roles, monkeypatch):
             conn.execute(text("SELECT count(*) FROM users")).scalar()
             conn.execute(text("INSERT INTO funnel_events (at, anon_session_id, step_id, event) VALUES (now(), 'x', 'chat', 'viewed')"))
             conn.execute(text("DELETE FROM funnel_events"))
+            conn.execute(text("INSERT INTO audit_log (at, action) VALUES (now(), 'test')"))
+        # The audit trail is append-only for the app.
+        for sql in ("UPDATE audit_log SET action = 'x'", "DELETE FROM audit_log"):
+            with pytest.raises(ProgrammingError):
+                with engine.begin() as conn:
+                    conn.execute(text(sql))
         with pytest.raises(ProgrammingError):
             with engine.begin() as conn:
                 conn.execute(text("CREATE TABLE should_fail (id int)"))

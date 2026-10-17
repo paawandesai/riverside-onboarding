@@ -12,3 +12,5 @@ infra/terraform/.terraform
 eval/results
 fixtures
 .git
+**/.env.*
+!**/.env.example

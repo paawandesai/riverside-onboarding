@@ -3,5 +3,5 @@ title = "riverside-onboarding gitleaks config"
 useDefault = true
 
 [allowlist]
-description = "Placeholder values in .env.example are not secrets"
-paths = ['''\.env\.example$''']
+description = "The change-me placeholders in .env.example are not secrets; any other value there is still scanned"
+regexes = ['''change-me''']

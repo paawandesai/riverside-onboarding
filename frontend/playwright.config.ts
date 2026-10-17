@@ -6,7 +6,7 @@ import { randomBytes } from "node:crypto";
 const PORT = 8010;
 const DATABASE_URL = process.env.E2E_DATABASE_URL ?? "postgresql+pg8000://onboarding@localhost:5432/onboarding_e2e";
 const PYTHON = process.env.E2E_PYTHON ?? ".venv/bin/python";
-// A staff account for the staff-view test, created per run (the public demo has none). Set once in the
+// A staff account for the staff-view test, created per run (the public demo's comes from Key Vault instead). Set once in the
 // main process so the worker processes, which re-read this file, see the same password.
 process.env.E2E_STAFF_EMAIL ??= "staff@e2e.example.com";
 process.env.E2E_STAFF_PASSWORD ??= randomBytes(18).toString("base64url");
