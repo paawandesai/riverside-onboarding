@@ -1,0 +1,249 @@
+.banner {
+  background: var(--ink);
+  color: var(--surface);
+  padding: 8px var(--gutter);
+  font-size: var(--text-sm);
+  text-align: center;
+}
+.banner--offline {
+  background: var(--support-bg);
+  color: var(--ink);
+  display: flex;
+  gap: 8px;
+  justify-content: center;
+  align-items: center;
+}
+
+.site-header {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  padding: 8px var(--gutter);
+  background: var(--surface);
+  border-bottom: 1px solid var(--line);
+}
+.brand {
+  font-family: var(--font-heading);
+  font-weight: 600;
+  color: var(--ink);
+  text-decoration: none;
+  min-height: var(--target);
+  display: inline-flex;
+  align-items: center;
+  flex-wrap: wrap;
+  column-gap: 6px;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.header-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+.header-actions .btn--link {
+  text-decoration: none;
+  font-size: var(--text-sm);
+}
+.header-actions .btn--link[aria-pressed="true"] {
+  text-decoration: underline;
+}
+
+main {
+  max-width: 40rem;
+  margin: 0 auto;
+  padding: calc(var(--space) * 6) var(--gutter) calc(var(--space) * 16);
+}
+.support-region:not(:empty) {
+  margin-bottom: calc(var(--space) * 6);
+}
+
+.back-link {
+  padding-left: 0;
+}
+.step-count {
+  margin: 0;
+}
+.lead {
+  font-size: var(--text-lg);
+}
+
+/* Start */
+.step-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: grid;
+  gap: 10px;
+}
+.step-list li {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+}
+.step-num {
+  flex: none;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: var(--accent-soft);
+  color: var(--ink);
+  display: grid;
+  place-items: center;
+  font-weight: 700;
+}
+
+/* Consent */
+.consent-points {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: grid;
+  gap: 12px;
+}
+.consent-points li {
+  display: flex;
+  gap: 10px;
+}
+.consent-points svg {
+  flex: none;
+  color: var(--accent);
+  margin-top: 3px;
+}
+details summary {
+  cursor: pointer;
+  font-weight: 700;
+  color: var(--accent);
+  min-height: var(--target);
+  display: flex;
+  align-items: center;
+}
+
+/* Chat */
+.chat-log {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.bubble {
+  max-width: 90%;
+  border-radius: var(--radius-card);
+  padding: 10px 14px;
+}
+.bubble p {
+  margin: 0;
+}
+.bubble--ai {
+  background: var(--accent-soft);
+  align-self: flex-start;
+}
+.bubble--user {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  align-self: flex-end;
+}
+.bubble-who {
+  color: var(--ink-2);
+  font-weight: 600;
+}
+.bubble-text {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.ai-badge {
+  display: inline-block;
+  font-size: var(--text-sm);
+  font-weight: 700;
+  border: 1.5px solid currentColor;
+  border-radius: 6px;
+  padding: 0 6px;
+  font-family: var(--font-body);
+}
+.composer {
+  display: flex;
+  gap: 8px;
+  align-items: flex-end;
+}
+.composer textarea {
+  min-height: var(--target);
+  resize: vertical;
+}
+.typing {
+  margin: 0;
+}
+
+/* ID capture */
+.id-frame {
+  aspect-ratio: 1.586;
+  border: 3px dashed var(--accent);
+  border-radius: var(--radius-card);
+  display: grid;
+  place-items: center;
+  background: var(--accent-soft);
+  color: var(--ink-2);
+  letter-spacing: 0.3em;
+  font-weight: 700;
+}
+.tips {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: grid;
+  gap: 8px;
+}
+.tips li {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+.id-preview {
+  width: 100%;
+  border-radius: var(--radius-card);
+  border: 1px solid var(--line);
+}
+
+/* Confirm */
+.dob-row,
+.address-row {
+  display: grid;
+  gap: 12px;
+}
+.dob-row {
+  grid-template-columns: 5rem 5rem 7rem;
+}
+.address-row {
+  grid-template-columns: 1fr;
+}
+@media (min-width: 30rem) {
+  .address-row {
+    grid-template-columns: 2fr 1fr 1.4fr;
+    align-items: end;
+  }
+}
+
+/* Book */
+.times .chip {
+  min-width: 6.5rem;
+}
+
+/* Dialog */
+.dialog-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgb(20 33 43 / 0.5);
+}
+.dialog {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: min(92vw, 30rem);
+  max-height: 85vh;
+  overflow: auto;
+}
+.dialog-close {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+}

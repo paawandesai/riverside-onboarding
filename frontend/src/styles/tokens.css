@@ -1,0 +1,56 @@
+/* "Clear clinic" tokens, from the UI design spec. Contrast checked in e2e with axe. */
+:root {
+  --ground: #f4f6f5;
+  --surface: #ffffff;
+  --ink: #14212b;
+  --ink-2: #4a5863;
+  --line: #c9d1d4;
+  --accent: #0b5f6e;
+  --accent-ink: #ffffff;
+  --accent-soft: #e2eff0;
+  --support-ink: #8a4b0f;
+  --support-bg: #fbf1e4;
+  --danger: #a1251b;
+  --danger-bg: #fbeceb;
+  --ocr-bg: #eef5f6;
+
+  --font-body: "Atkinson Hyperlegible Next", system-ui, sans-serif;
+  --font-heading: "Literata", Georgia, serif;
+  --text: 1.0625rem; /* 17px body */
+  --text-sm: 0.9375rem; /* 15px minimum anywhere */
+  --text-lg: 1.25rem;
+  --text-xl: 1.75rem;
+
+  --radius-card: 12px;
+  --radius-control: 10px;
+  --radius-chip: 999px;
+  --space: 4px;
+  --gutter: 20px;
+  --target: 44px;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --ground: #0f171c;
+    --surface: #17222a;
+    --ink: #e8eef0;
+    --ink-2: #b2bfc6;
+    --line: #3b4a53;
+    --accent: #7fc6d3;
+    --accent-ink: #0c1a1f;
+    --accent-soft: #1d3b42;
+    --support-ink: #f1c38f;
+    --support-bg: #33240f;
+    --danger: #ff9d93;
+    --danger-bg: #3a1714;
+    --ocr-bg: #1b2f35;
+  }
+}
+
+/* Larger text preference (stored per device; no personal data). */
+:root[data-text-size="large"] {
+  --text: 1.25rem;
+  --text-sm: 1.0625rem;
+  --text-lg: 1.4rem;
+  --text-xl: 2rem;
+}

@@ -5,11 +5,11 @@ import globals from "globals";
 import tseslint from "typescript-eslint";
 
 export default tseslint.config(
-  { ignores: ["dist", "coverage", "jest.config.cjs"] },
+  { ignores: ["dist", "coverage", "playwright-report", "test-results"] },
   {
     files: ["**/*.{ts,tsx}"],
     extends: [js.configs.recommended, ...tseslint.configs.recommended, jsxA11y.flatConfigs.strict],
-    languageOptions: { globals: { ...globals.browser, ...globals.jest } },
+    languageOptions: { globals: { ...globals.browser, ...globals.jest, vi: "readonly" } },
     plugins: { "react-hooks": reactHooks },
     rules: {
       ...reactHooks.configs.recommended.rules,
