@@ -16,7 +16,11 @@ test("ID scan path: consent, chat, scan, check, book, done", async ({ page }) =>
   await page.getByRole("button", { name: "These are correct" }).click();
 
   await expect(page.getByRole("heading", { name: "Pick a time" })).toBeVisible();
-  await page.getByRole("group", { name: /^Times on/ }).getByRole("button").first().click();
+  await page
+    .getByRole("group", { name: /^Times on/ })
+    .getByRole("button")
+    .first()
+    .click();
   await page.getByRole("button", { name: "Book this time" }).click();
   await expect(page.getByRole("heading", { name: "You're booked" })).toBeVisible();
   await expect(page.getByText(/Confirmation code [0-9A-F]{8}/)).toBeVisible();
@@ -24,7 +28,11 @@ test("ID scan path: consent, chat, scan, check, book, done", async ({ page }) =>
 
   // The server kept no image: the intake record holds only the confirmed text fields.
   const intake = await page.request.get("/api/intake").then((r) => r.json());
-  expect(intake.field_sources).toEqual({ full_name: "ocr_confirmed", dob: "ocr_confirmed", address: "ocr_confirmed" });
+  expect(intake.field_sources).toEqual({
+    full_name: "ocr_confirmed",
+    dob: "ocr_confirmed",
+    address: "ocr_confirmed",
+  });
 });
 
 test("unreadable photo falls back to typing", async ({ page }) => {
@@ -71,7 +79,11 @@ test("two patients, one slot: the second sees it was taken and nearby times", as
     await p.getByRole("button", { name: "Save and continue" }).click();
     await expect(p.getByRole("heading", { name: "Pick a time" })).toBeVisible();
     await p.getByRole("button", { name: "No preference" }).click();
-    await p.getByRole("group", { name: /^Times on/ }).getByRole("button").first().click();
+    await p
+      .getByRole("group", { name: /^Times on/ })
+      .getByRole("button")
+      .first()
+      .click();
   }
   await a.getByRole("button", { name: "Book this time" }).click();
   await expect(a.getByRole("heading", { name: "You're booked" })).toBeVisible();
@@ -108,6 +120,11 @@ test("security headers are set and the page works under the CSP", async ({ page 
   expect(headers["content-security-policy"]).toContain("script-src 'self'");
   expect(headers["x-robots-tag"]).toContain("noindex");
   await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
+  // Dialogs add a scroll-lock <style> tag; it must carry the page's CSP nonce, not be blocked.
+  await page.getByRole("button", { name: "Help" }).click();
+  await expect(page.getByRole("dialog", { name: "Help" })).toBeVisible();
+  expect(await page.evaluate(() => getComputedStyle(document.body).overflow)).toBe("hidden");
+  await page.keyboard.press("Escape");
   expect(errors.filter((e) => /Content Security Policy/i.test(e))).toEqual([]);
 });
 

@@ -2,37 +2,87 @@
   "distress": {
     "title": "It sounds like this is a lot right now.",
     "body": "You don't have to finish this today. If you're in danger or thinking about harming yourself, call or text 988 (Suicide & Crisis Lifeline, US) or call 911. If you'd rather talk to someone at the clinic, call the front desk.",
-    "actions": ["Talk to a person", "Continue when ready"],
+    "actions": [
+      {
+        "id": "talk_to_person",
+        "label": "Talk to a person"
+      },
+      {
+        "id": "continue",
+        "label": "Continue when ready"
+      }
+    ],
     "urgent": true
   },
   "llm_unavailable": {
     "title": "I'm having trouble responding.",
-    "body": "The assistant isn't answering right now. You can try again, or answer a few short questions in a form instead. Nothing you've entered is lost.",
-    "actions": ["Try again", "Continue with a form"],
+    "body": "The assistant isn't answering right now. You can try again, or answer a few short questions in a form instead. What you've typed so far stays on this page.",
+    "actions": [
+      {
+        "id": "try_again",
+        "label": "Try again"
+      },
+      {
+        "id": "use_form",
+        "label": "Continue with a form"
+      }
+    ],
     "urgent": false
   },
   "upload_failed": {
     "title": "That photo was hard to read. That's okay.",
     "body": "Your photo has been deleted. You can try one more photo in even light with the card flat, or type your details instead. Both ways work.",
-    "actions": ["Try again", "Type it instead"],
+    "actions": [
+      {
+        "id": "try_again",
+        "label": "Try again"
+      },
+      {
+        "id": "type_instead",
+        "label": "Type it instead"
+      }
+    ],
     "urgent": false
   },
   "ocr_low_confidence": {
     "title": "Please check what we read.",
     "body": "Some details from your photo may be wrong. Fields marked \"From your photo\" need a quick look before you continue.",
-    "actions": ["Check my details"],
+    "actions": [
+      {
+        "id": "check_details",
+        "label": "Check my details"
+      }
+    ],
     "urgent": false
   },
   "booking_conflict": {
     "title": "Times are filling fast.",
     "body": "Those times were taken while you were choosing. You can pick another time below, or call the front desk and they'll book you.",
-    "actions": ["See other times", "Talk to a person"],
+    "actions": [
+      {
+        "id": "see_other_times",
+        "label": "See other times"
+      },
+      {
+        "id": "talk_to_person",
+        "label": "Talk to a person"
+      }
+    ],
     "urgent": false
   },
   "long_pause": {
     "title": "Take your time.",
-    "body": "Your progress is saved. You can keep going whenever you're ready, or save and finish later.",
-    "actions": ["Continue", "Save and finish later"],
+    "body": "Take a break if you need one. Steps you've finished are saved; answers on this page are saved when you continue. You can keep going whenever you're ready, or finish later.",
+    "actions": [
+      {
+        "id": "continue",
+        "label": "Continue"
+      },
+      {
+        "id": "save_and_leave",
+        "label": "Save and finish later"
+      }
+    ],
     "urgent": false
   }
 }

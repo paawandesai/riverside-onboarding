@@ -50,11 +50,10 @@ def test_strips_exif_including_gps():
 
 
 def test_accepts_heic():
-    import pillow_heif
-
-    buf = io.BytesIO()
-    pillow_heif.from_pillow(Image.new("RGB", (64, 64), "white")).save(buf, quality=80)
-    assert validate_and_clean(buf.getvalue(), 10_000_000).source_format in {"HEIF", "HEIC"}
+    # The decoder is decode-only, so the sample was made once and committed as a fixture.
+    with open(os.path.join(FIXTURES, "generated-heic-sample.heic"), "rb") as fh:
+        clean = validate_and_clean(fh.read(), 10_000_000)
+    assert clean.source_format in {"HEIF", "HEIC"} and clean.image.size == (320, 200)
 
 
 def test_normalize_dob_formats_and_refusals():
@@ -163,5 +162,5 @@ def test_extract_needs_separate_photo_consent(user_client):
         r = user_client.post("/api/documents/extract", files={"file": ("card.jpg", fh, "image/jpeg")})
     assert r.status_code == 403 and "type your details" in r.json()["detail"]
     # Turning photo consent on later works without a second full consent.
-    assert user_client.post("/api/consent", json={"photo_scan": True}).json()["photo_scan"] is True
+    assert user_client.put("/api/consent/photo", json={"photo_scan": True}).json()["photo_scan"] is True
     assert user_client.get("/api/consent").json() == {"active": True, "version": CONSENT_VERSION, "photo_scan": True}

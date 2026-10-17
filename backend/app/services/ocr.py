@@ -74,12 +74,21 @@ def _deskew_angle(gray: Image.Image) -> float:
     return best_angle
 
 
+def _upscale(gray: Image.Image) -> Image.Image:
+    """Upscale small photos so glyphs are large enough for Tesseract (~30px cap height).
+
+    The longest side is capped so a tall, narrow image can't turn into a huge allocation.
+    """
+    if gray.width >= 1600:
+        return gray
+    scale = min(1600 / gray.width, 4000 / max(gray.width, gray.height))
+    if scale <= 1:
+        return gray
+    return gray.resize((int(gray.width * scale), int(gray.height * scale)), Image.Resampling.LANCZOS)
+
+
 def preprocess(image: Image.Image) -> Image.Image:
-    gray = ImageOps.grayscale(image)
-    # Upscale small photos so glyphs are large enough for Tesseract (~30px cap height).
-    if gray.width < 1600:
-        scale = 1600 / gray.width
-        gray = gray.resize((int(gray.width * scale), int(gray.height * scale)), Image.Resampling.LANCZOS)
+    gray = _upscale(ImageOps.grayscale(image))
     angle = _deskew_angle(gray)
     if abs(angle) >= 0.5:
         gray = gray.rotate(angle, resample=Image.Resampling.BICUBIC, expand=True, fillcolor=255)
@@ -97,9 +106,7 @@ def preprocess_flat(image: Image.Image) -> Image.Image:
     """
     rgb = np.asarray(image.convert("RGB"), dtype=np.float32)
     gray = Image.fromarray(rgb.max(axis=2).astype(np.uint8))
-    if gray.width < 1600:
-        scale = 1600 / gray.width
-        gray = gray.resize((int(gray.width * scale), int(gray.height * scale)), Image.Resampling.LANCZOS)
+    gray = _upscale(gray)
     angle = _deskew_angle(gray)
     if abs(angle) >= 0.5:
         gray = gray.rotate(angle, resample=Image.Resampling.BICUBIC, expand=True, fillcolor=255)

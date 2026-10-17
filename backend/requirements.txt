@@ -10,7 +10,7 @@ cryptography==50.0.2
 itsdangerous==2.2.0
 pytesseract==0.3.13
 pillow==13.0.0
-pillow-heif==1.8.1
+pi-heif==1.4.0
 python-multipart==0.0.32
 anthropic==1.15.0
 numpy==2.5.4

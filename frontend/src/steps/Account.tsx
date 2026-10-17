@@ -1,5 +1,5 @@
 import { zodResolver } from "@hookform/resolvers/zod";
-import { useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { Link, Navigate, useLocation, useNavigate, useSearchParams } from "react-router";
@@ -46,7 +46,13 @@ function AccountForm({ signIn }: { signIn: boolean }) {
     setServerError(undefined);
     try {
       if (signIn) await api.login({ email: v.email, password: v.password });
-      else await api.signup({ email: v.email, password: v.password, invite_code: v.invite_code.trim(), adult_attestation: true });
+      else
+        await api.signup({
+          email: v.email,
+          password: v.password,
+          invite_code: v.invite_code.trim(),
+          adult_attestation: true,
+        });
       await queryClient.invalidateQueries({ queryKey: ["me"] });
       const me = signIn ? await api.me() : null;
       navigate(me?.role === "staff" ? "/staff" : signIn ? nextPath(await api.progress()) : "/consent");
@@ -55,14 +61,24 @@ function AccountForm({ signIn }: { signIn: boolean }) {
     }
   };
 
-  const summary = Object.entries(errors).map(([field, e]) => ({ field, message: e?.message ?? "" }));
+  const summary = Object.entries(errors).map(([field, e]) => ({
+    field,
+    message: e?.message ?? "",
+  }));
   if (serverError) summary.unshift({ field: "email", message: serverError });
 
   return (
     <StepPage title={signIn ? t("account.signInTitle") : t("account.title")} back="/">
       <ErrorSummary errors={summary} />
       <form className="stack" noValidate onSubmit={(e) => void handleSubmit(onSubmit)(e)}>
-        <TextField id="email" label={t("account.email")} type="email" autoComplete="email" error={errors.email?.message} {...register("email")} />
+        <TextField
+          id="email"
+          label={t("account.email")}
+          type="email"
+          autoComplete="email"
+          error={errors.email?.message}
+          {...register("email")}
+        />
         <TextField
           id="password"
           label={t("account.password")}
@@ -82,6 +98,7 @@ function AccountForm({ signIn }: { signIn: boolean }) {
             {...register("invite_code")}
           />
         )}
+        {!signIn && <PrivacyNote />}
         <button type="submit" className="btn btn--block" disabled={isSubmitting}>
           {signIn ? t("account.signIn") : t("account.create")}
         </button>
@@ -96,5 +113,29 @@ function AccountForm({ signIn }: { signIn: boolean }) {
         </p>
       )}
     </StepPage>
+  );
+}
+
+/** Signing up stores an email and password before the consent step, so say so here, with the notice one click away. */
+function PrivacyNote() {
+  const text = useQuery({
+    queryKey: ["consent-text"],
+    queryFn: api.consentText,
+    staleTime: Infinity,
+  });
+  return (
+    <div className="stack">
+      <p className="muted small">{t("account.privacyNote")}</p>
+      {text.data && (
+        <details>
+          <summary>{t("account.privacyLink")}</summary>
+          <ul>
+            {text.data.points.map((p) => (
+              <li key={p}>{p}</li>
+            ))}
+          </ul>
+        </details>
+      )}
+    </div>
   );
 }

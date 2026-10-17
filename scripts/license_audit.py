@@ -39,26 +39,89 @@ def python_license(dist: metadata.Distribution) -> str:
 
 
 def python_runtime_closure() -> set[str]:
-    wanted = []
-    for line in (ROOT / "backend/requirements.txt").read_text().splitlines():
-        line = line.split("#")[0].strip()
-        if line:
-            wanted.append(_canon(re.split(r"[\[=<>~ ]", line)[0]))
-    seen: set[str] = set()
-    while wanted:
-        name = wanted.pop()
-        if name in seen:
+    """Everything the image installs: the hash-pinned runtime lock, which Docker and CI install as-is."""
+    names = set()
+    for line in (ROOT / "backend/requirements.lock").read_text().splitlines():
+        if m := re.match(r"^([A-Za-z0-9_.-]+)==", line):
+            names.add(_canon(m.group(1)))
+    return names
+
+
+# Native libraries that wheels bundle (in <package>.libs/). Python metadata only describes the Python
+# package, so these are checked separately: a GPL library loaded in-process would break the rules.
+NATIVE_LICENSES = {
+    "libx265": "GPL-2.0-or-later",
+    "libheif": "LGPL-3.0",
+    "libde265": "LGPL-3.0",
+    "libgfortran": "GPL-3.0-with-GCC-exception",
+    "libquadmath": "LGPL-2.1",
+    "libscipy-openblas64-": "BSD-3-Clause",
+    "libfreetype": "FTL OR GPL-2.0 (used under FTL)",
+    "libharfbuzz": "MIT",
+    "libjpeg": "IJG AND BSD-3-Clause",
+    "liblcms2": "MIT",
+    "liblzma": "0BSD",
+    "libopenjp2": "BSD-2-Clause",
+    "libpng16": "libpng-2.0",
+    "libtiff": "libtiff",
+    "libwebp": "BSD-3-Clause",
+    "libwebpdemux": "BSD-3-Clause",
+    "libwebpmux": "BSD-3-Clause",
+    "libsharpyuv": "BSD-3-Clause",
+    "libavif": "BSD-2-Clause",
+    "libbrotlicommon": "MIT",
+    "libbrotlidec": "MIT",
+    "libzstd": "BSD-3-Clause",
+    "libxcb": "MIT",
+    "libxau": "MIT",
+}
+# Licenses that are fine for a separately loaded, unmodified shared library.
+NATIVE_OK = re.compile(r"GCC-exception|\(used under FTL\)|^LGPL", re.I)
+
+
+def _native_name(filename: str) -> str:
+    stem = filename.split(".so")[0]
+    return _canon(re.sub(r"-[0-9a-f]{8}(?:-[0-9a-f]{8})?$", "", stem))
+
+
+def native_rows(runtime: set[str]) -> tuple[list[str], list[str]]:
+    rows, problems = [], []
+    for dist in metadata.distributions():
+        pkg = _canon(dist.metadata["Name"])
+        if pkg not in runtime:
             continue
-        try:
-            dist = metadata.distribution(name)
-        except metadata.PackageNotFoundError:
-            continue
-        seen.add(name)
-        for req in dist.requires or []:
-            if "extra ==" in req and not re.search(r'extra == "standard"', req):
+        for f in dist.files or []:
+            path = str(f)
+            if path.endswith("LICENSES_bundled.txt"):
+                head = (f.locate().read_text(errors="replace").splitlines() or [""])[0]
+                if STRONG_COPYLEFT.search(head) and not WEAK_COPYLEFT.search(head):
+                    problems.append(f"Bundled libraries: {pkg} says '{head.strip()}'")
+            if ".libs/" not in path or ".so" not in path:
                 continue
-            wanted.append(_canon(re.split(r"[\[=<>~!; (]", req)[0]))
-    return seen
+            lib = _native_name(path.split("/")[-1])
+            lic = NATIVE_LICENSES.get(lib, "UNKNOWN")
+            if lic == "UNKNOWN":
+                status = "unknown"
+            elif NATIVE_OK.search(lic):
+                status = "review"
+            else:
+                status = classify(lic)
+            if status in ("disallowed", "unknown"):
+                problems.append(f"Bundled libraries: {lib} in {pkg} ({lic})")
+            rows.append(f"| {pkg} | {lib} | {lic} | {status} |")
+    out = [
+        "## Native libraries bundled in Python wheels",
+        "",
+        "Loaded as separate shared libraries, unmodified. LGPL libraries can be replaced in the image; their sources are "
+        "linked from each wheel's bundled licence file. The FreeType credit: portions of this software are copyright "
+        "The FreeType Project (www.freetype.org). All rights reserved.",
+        "",
+        "| Package | Library | License | Status |",
+        "|---|---|---|---|",
+        *sorted(set(rows)),
+        "",
+    ]
+    return out, problems
 
 
 def python_rows() -> list[tuple[str, str, str, bool]]:
@@ -79,7 +142,9 @@ def npm_rows() -> list[tuple[str, str, str, bool]]:
         if not path:
             continue
         name = path.split("node_modules/")[-1]
-        rows.append((name, pkg.get("version", "?"), pkg.get("license") or "UNKNOWN", not pkg.get("dev", False)))
+        # devOptional packages (types, schema tools) are only installed for development builds.
+        shipped = not pkg.get("dev", False) and not pkg.get("devOptional", False)
+        rows.append((name, pkg.get("version", "?"), pkg.get("license") or "UNKNOWN", shipped))
     return sorted(set(rows))
 
 
@@ -119,8 +184,9 @@ def section(title: str, rows: list[tuple[str, str, str, bool]]) -> tuple[list[st
 
 def main() -> int:
     py, py_problems = section("Backend (Python)", python_rows())
+    native, native_problems = native_rows(python_runtime_closure())
     js, js_problems = section("Frontend (npm)", npm_rows())
-    problems = py_problems + js_problems
+    problems = py_problems + native_problems + js_problems
     lines = [
         "# Third-party licenses",
         "",
@@ -129,10 +195,12 @@ def main() -> int:
         '"review" means weak copyleft (LGPL/MPL): allowed when used unmodified as a separate library.',
         "",
         "System tools outside these lists: Tesseract OCR (Apache-2.0, run as a separate process), "
+        "the Debian tesseract-ocr package and its libraries (leptonica BSD-2-Clause, libarchive BSD-2-Clause, and others), "
         "PostgreSQL (PostgreSQL License), k6 (AGPL-3.0, an external load-test CLI that is not linked or shipped), "
         "gitleaks (MIT, dev hook only).",
         "",
         *py,
+        *native,
         *js,
         "## Result",
         "",

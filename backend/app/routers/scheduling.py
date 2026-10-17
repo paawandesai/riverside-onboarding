@@ -4,13 +4,14 @@ from datetime import datetime
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import JSONResponse
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.db import get_db
 from app.logging_config import log_event
 from app.models import Booking, Slot, User
+from app.routers.intake import require_consent
 from app.security import current_user
 from app.services import scheduling
 
@@ -34,7 +35,7 @@ class BookingOut(BaseModel):
 
 
 class BookIn(BaseModel):
-    slot_id: int
+    slot_id: int = Field(ge=1, le=2**31 - 1)
 
 
 def _slot_out(slot: Slot) -> SlotOut:
@@ -56,12 +57,14 @@ class ConflictOut(BaseModel):
 
 
 @router.post("/bookings", response_model=BookingOut, status_code=201, responses={409: {"model": ConflictOut}})
-def create_booking(body: BookIn, user: User = Depends(current_user), db: Session = Depends(get_db)) -> BookingOut | JSONResponse:
+def create_booking(body: BookIn, user: User = Depends(require_consent), db: Session = Depends(get_db)) -> BookingOut | JSONResponse:
     started = time.perf_counter()
     try:
         booking = scheduling.book(db, user.id, body.slot_id)
     except scheduling.SlotNotFound:
         raise HTTPException(status_code=404, detail="That time isn't available.") from None
+    except scheduling.BookingInProgress:
+        raise HTTPException(status_code=409, detail="Your booking was just changed in another window. Please reload to see it.") from None
     except scheduling.SlotUnavailable:
         log_event(logger, "booking_conflict", component="scheduling", outcome="conflict", user_id=user.id)
         # Offer the closest open times so the patient doesn't have to start over.
@@ -90,6 +93,6 @@ def my_bookings(user: User = Depends(current_user), db: Session = Depends(get_db
 
 
 @router.post("/bookings/{booking_id}/cancel", status_code=204)
-def cancel_booking(booking_id: str, user: User = Depends(current_user), db: Session = Depends(get_db)) -> None:
+def cancel_booking(booking_id: str, user: User = Depends(require_consent), db: Session = Depends(get_db)) -> None:
     if not scheduling.cancel(db, user.id, booking_id):
         raise HTTPException(status_code=404, detail="Booking not found.")

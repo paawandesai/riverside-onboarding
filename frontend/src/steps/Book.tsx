@@ -4,7 +4,7 @@ import { useNavigate } from "react-router";
 import { api, ApiError, type Conflict, type Slot } from "../api";
 import { useSupport, useSupportActions } from "../app/support";
 import { StepPage } from "../components/StepPage";
-import { dayKey, formatDay, formatLongDay, formatTime } from "../features/format";
+import { dayKey, formatDay, formatLongDay, formatTime, formatZone } from "../features/format";
 import { t } from "../i18n";
 
 type VisitFilter = "in_person" | "telehealth" | "any";
@@ -19,15 +19,26 @@ export default function Book() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const support = useSupport();
-  const intake = useQuery({ queryKey: ["intake"], queryFn: api.intake, retry: false });
+  const intake = useQuery({
+    queryKey: ["intake"],
+    queryFn: api.intake,
+    retry: false,
+  });
   const preference = intake.data?.assessment?.visit_type_preference as VisitFilter | undefined;
   const [filter, setFilter] = useState<VisitFilter | null>(null);
   const visit = filter ?? (preference === "in_person" || preference === "telehealth" ? preference : "any");
-  const slots = useQuery({ queryKey: ["slots", visit], queryFn: () => api.slots(visit === "any" ? undefined : visit) });
+  const slots = useQuery({
+    queryKey: ["slots", visit],
+    queryFn: () => api.slots(visit === "any" ? undefined : visit),
+  });
   const mine = useQuery({ queryKey: ["bookings"], queryFn: api.myBookings });
   const [day, setDay] = useState<string | null>(null);
   const [selected, setSelected] = useState<number | null>(null);
-  const [conflict, setConflict] = useState<{ time: string; takenId: number; alternatives: number[] } | null>(null);
+  const [conflict, setConflict] = useState<{
+    time: string;
+    takenId: number;
+    alternatives: number[];
+  } | null>(null);
   const [conflicts, setConflicts] = useState(0);
   const [noChoice, setNoChoice] = useState(false);
   const message = useRef<HTMLDivElement>(null);
@@ -54,7 +65,11 @@ export default function Book() {
       const body = e.body as Conflict;
       const taken = slots.data?.find((s) => s.id === slotId);
       const alternatives = body.alternatives.map((a) => a.id);
-      setConflict({ time: taken ? formatTime(taken.starts_at) : "", takenId: slotId, alternatives });
+      setConflict({
+        time: taken ? formatTime(taken.starts_at) : t("book.thatTime"),
+        takenId: slotId,
+        alternatives,
+      });
       setSelected(null);
       if (body.alternatives[0]) setDay(dayKey(body.alternatives[0].starts_at));
       const count = conflicts + 1;
@@ -65,7 +80,7 @@ export default function Book() {
     },
   });
 
-  useSupportActions((action) => action === "See other times");
+  useSupportActions((action) => action === "see_other_times");
 
   const current = mine.data?.[0];
 
@@ -74,11 +89,23 @@ export default function Book() {
       title={t("book.title")}
       step={5}
       back="/details/confirm"
-      lead={<p className="muted">{t("book.visit", { minutes: daySlots[0]?.duration_minutes ?? 40, address: t("clinic.address") })}</p>}
+      lead={
+        <>
+          <p className="muted">
+            {t("book.visit", {
+              minutes: daySlots[0]?.duration_minutes ?? 40,
+              address: t("clinic.address"),
+            })}
+          </p>
+          {daySlots[0] && <p className="muted small">{t("book.timeZone", { zone: formatZone(daySlots[0].starts_at) })}</p>}
+        </>
+      }
     >
       {current && (
         <p className="card">
-          {t("book.current", { when: `${formatLongDay(current.slot.starts_at)}, ${formatTime(current.slot.starts_at)}` })}
+          {t("book.current", {
+            when: `${formatLongDay(current.slot.starts_at)}, ${formatTime(current.slot.starts_at)}`,
+          })}
         </p>
       )}
       <fieldset className="field">
@@ -141,7 +168,11 @@ export default function Book() {
             </div>
           </fieldset>
           <fieldset className="field">
-            <legend>{t("book.times", { day: daySlots[0] ? formatLongDay(daySlots[0].starts_at) : "" })}</legend>
+            <legend>
+              {t("book.times", {
+                day: daySlots[0] ? formatLongDay(daySlots[0].starts_at) : "",
+              })}
+            </legend>
             {daySlots.length === 0 && <p>{t("book.none")}</p>}
             <div className="chips times">
               {daySlots.map((s) => {
@@ -161,7 +192,8 @@ export default function Book() {
                     {formatTime(s.starts_at)}
                     <span className="visually-hidden">
                       {" "}
-                      {s.visit_type === "telehealth" ? t("form.telehealth") : t("form.inPerson")}, {t("book.with", { clinician: s.clinician_label })}
+                      {s.visit_type === "telehealth" ? t("form.telehealth") : t("form.inPerson")},{" "}
+                      {t("book.with", { clinician: s.clinician_label })}
                     </span>
                   </button>
                 );

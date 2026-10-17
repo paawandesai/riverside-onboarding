@@ -5,14 +5,18 @@ import { Deleted, FrontDesk, Saved } from "../steps/Simple";
 import { Start } from "../steps/Start";
 import { ErrorPage } from "./ErrorPage";
 import { Layout } from "./Layout";
-import { RequireAuth } from "./RequireAuth";
+import { RequireAuth, RequireConsent } from "./RequireAuth";
 
 // Every step after the start page loads on demand, keeping the first load small (budget: 170 KB gzip).
 const Account = lazy(() => import("../steps/Account").then((m) => ({ default: m.Account })));
 const Consent = lazy(() => import("../steps/Consent").then((m) => ({ default: m.Consent })));
 const Chat = lazy(() => import("../steps/Chat").then((m) => ({ default: m.Chat })));
 const IdCapture = lazy(() => import("../steps/IdCapture"));
-const ConfirmDetails = lazy(() => import("../steps/ConfirmDetails").then((m) => ({ default: m.ConfirmDetails })));
+const ConfirmDetails = lazy(() =>
+  import("../steps/ConfirmDetails").then((m) => ({
+    default: m.ConfirmDetails,
+  })),
+);
 const Book = lazy(() => import("../steps/Book"));
 const Done = lazy(() => import("../steps/Done").then((m) => ({ default: m.Done })));
 const Privacy = lazy(() => import("../steps/Privacy").then((m) => ({ default: m.Privacy })));
@@ -25,7 +29,8 @@ const later = (node: ReactNode) => <Suspense fallback={<p aria-live="polite">{t(
 export const routes = [
   {
     element: <Layout />,
-    errorElement: <ErrorPage />,
+    // Outside the layout, so it carries its own demo banner and main landmark.
+    errorElement: <ErrorPage standalone />,
     children: [
       { path: "/", element: <Start /> },
       { path: "/account", element: later(<Account />) },
@@ -36,11 +41,16 @@ export const routes = [
         element: <RequireAuth />,
         children: [
           { path: "/consent", element: later(<Consent />) },
-          { path: "/chat", element: later(<Chat />) },
-          { path: "/details", element: later(<IdCapture />) },
-          { path: "/details/confirm", element: later(<ConfirmDetails />) },
-          { path: "/book", element: later(<Book />) },
-          { path: "/done", element: later(<Done />) },
+          {
+            element: <RequireConsent />,
+            children: [
+              { path: "/chat", element: later(<Chat />) },
+              { path: "/details", element: later(<IdCapture />) },
+              { path: "/details/confirm", element: later(<ConfirmDetails />) },
+              { path: "/book", element: later(<Book />) },
+              { path: "/done", element: later(<Done />) },
+            ],
+          },
           { path: "/privacy", element: later(<Privacy />) },
         ],
       },
@@ -48,7 +58,10 @@ export const routes = [
         element: later(<RequireStaff />),
         children: [
           { path: "/staff", element: later(<StaffSchedule />) },
-          { path: "/staff/patients/:patientId", element: later(<StaffIntake />) },
+          {
+            path: "/staff/patients/:patientId",
+            element: later(<StaffIntake />),
+          },
         ],
       },
       { path: "*", element: <ErrorPage notFound /> },

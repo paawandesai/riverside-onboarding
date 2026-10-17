@@ -162,8 +162,21 @@ details summary {
 }
 .composer {
   display: flex;
+  flex-wrap: wrap;
   gap: 8px;
   align-items: flex-end;
+}
+.composer-label {
+  flex-basis: 100%;
+  font-weight: 600;
+}
+.composer textarea {
+  flex: 1 1 0;
+  min-width: 0;
+}
+.composer-hint {
+  flex-basis: 100%;
+  margin: 0;
 }
 .composer textarea {
   min-height: var(--target);

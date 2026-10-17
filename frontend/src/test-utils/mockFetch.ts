@@ -1,17 +1,40 @@
 type Reply = { status?: number; body?: unknown };
 type Handler = (url: string, init?: RequestInit) => Reply;
 
-export type Call = { method: string; url: string; body: unknown; headers: Record<string, string> };
+export type Call = {
+  method: string;
+  url: string;
+  body: unknown;
+  headers: Record<string, string>;
+};
 
 /** Route table for fetch: "METHOD /path" -> reply. Records every call for assertions. */
-export function mockFetch(routes: Record<string, Handler | Reply>) {
+export function mockFetch(given: Record<string, Handler | Reply>) {
+  // Consent-gated steps check progress first; tests that care override this.
+  const routes: Record<string, Handler | Reply> = {
+    "GET /api/progress": {
+      body: {
+        consent: true,
+        photo_scan: false,
+        assessment_done: false,
+        identity_done: false,
+        booked: false,
+      },
+    },
+    ...given,
+  };
   const calls: Call[] = [];
   globalThis.fetch = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
     const url = String(input);
     const method = init?.method ?? "GET";
     let body: unknown = init?.body;
     if (typeof body === "string") body = JSON.parse(body);
-    calls.push({ method, url, body, headers: (init?.headers ?? {}) as Record<string, string> });
+    calls.push({
+      method,
+      url,
+      body,
+      headers: (init?.headers ?? {}) as Record<string, string>,
+    });
     const key = Object.keys(routes)
       .filter((k) => {
         const [m, path] = k.split(" ");

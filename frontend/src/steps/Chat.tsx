@@ -2,7 +2,7 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Bot, Send } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router";
-import { api, type AssessmentFields, type ChatTurn } from "../api";
+import { api, ApiError, type AssessmentFields, type ChatTurn } from "../api";
 import { useDraft } from "../app/draft";
 import { useSupport, useSupportActions } from "../app/support";
 import { StepPage } from "../components/StepPage";
@@ -27,6 +27,7 @@ export function Chat() {
   const [text, setText] = useState("");
   const [pending, setPending] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
+  const [failure, setFailure] = useState<string | null>(null);
   const [showForm, setShowForm] = useState(false);
   const abort = useRef<AbortController | null>(null);
   const formRef = useRef<HTMLDivElement>(null);
@@ -38,7 +39,10 @@ export function Chat() {
     .filter((turn) => turn.role === "user")
     .map((turn) => turn.content)
     .join("\n");
-  const formInitial = { ...draft.fields, reason_for_visit: draft.fields.reason_for_visit || ownWords || null };
+  const formInitial = {
+    ...draft.fields,
+    reason_for_visit: draft.fields.reason_for_visit || ownWords || null,
+  };
 
   const save = useMutation({
     mutationFn: (fields: AssessmentValues | AssessmentFields) =>
@@ -54,23 +58,34 @@ export function Chat() {
     },
   });
 
-  const openForm = () => {
+  const openForm = (focus = true) => {
     setShowForm(true);
-    requestAnimationFrame(() => formRef.current?.querySelector("textarea")?.focus());
+    if (focus) requestAnimationFrame(() => formRef.current?.querySelector("textarea")?.focus());
   };
 
   const send = async (turns: ChatTurn[]) => {
     draft.setTranscript(turns);
     setPending(true);
+    setFailure(null);
     abort.current = new AbortController();
     try {
       const result = await api.chat(turns, abort.current.signal);
-      draft.setTranscript([...turns, { role: "assistant", content: result.reply }]);
+      // The signature lets the server check this reply really came from it when the history is sent back.
+      draft.setTranscript([...turns, { role: "assistant", content: result.reply, sig: result.reply_sig }]);
       draft.setFields(mergeFields(draft.fields, result.fields));
       setNotice(result.notice);
       if (result.support) support.present(result.support);
-    } catch {
-      if (!abort.current?.signal.aborted) void support.show({ llm_unavailable: true });
+    } catch (e) {
+      if (abort.current?.signal.aborted) return;
+      if (e instanceof ApiError && (e.status === 401 || e.status === 403)) {
+        // Signed out, or consent was withdrawn elsewhere: go back to the step that fixes it.
+        navigate(e.status === 401 ? "/account?mode=signin" : "/consent");
+        return;
+      }
+      // Never a silent failure: say so here, open the form so the step can still be finished, and offer support.
+      setFailure(e instanceof ApiError && e.status === 429 ? t("chat.tooFast") : t("chat.failed"));
+      openForm(false);
+      void support.show({ llm_unavailable: true });
     } finally {
       setPending(false);
     }
@@ -84,11 +99,11 @@ export function Chat() {
   };
 
   useSupportActions((action) => {
-    if (action === "Try again") {
+    if (action === "try_again") {
       void send(draft.transcript);
       return true;
     }
-    if (action === "Continue with a form") {
+    if (action === "use_form") {
       openForm();
       return true;
     }
@@ -112,6 +127,16 @@ export function Chat() {
         </p>
       )}
       {notice && <p className="muted small">{notice}</p>}
+      {failure && (
+        <div className="card stack" role="alert">
+          <p>{failure}</p>
+          <div className="row">
+            <button type="button" className="btn" disabled={pending} onClick={() => void send(draft.transcript)}>
+              {t("common.tryAgain")}
+            </button>
+          </div>
+        </div>
+      )}
       {!hasUserTurn && (
         <div className="chips">
           {QUICK.map((k) => (
@@ -128,12 +153,13 @@ export function Chat() {
           submit(text);
         }}
       >
-        <label htmlFor="chat-input" className="visually-hidden">
+        <label htmlFor="chat-input" className="composer-label">
           {t("chat.message")}
         </label>
         <textarea
           id="chat-input"
           className="input"
+          aria-describedby="chat-hint"
           rows={2}
           maxLength={1000}
           value={text}
@@ -148,6 +174,9 @@ export function Chat() {
         <button type="submit" className="btn" disabled={pending || !text.trim()} aria-label={t("chat.send")}>
           <Send aria-hidden="true" size={20} />
         </button>
+        <p id="chat-hint" className="muted small composer-hint">
+          {t("chat.hint")}
+        </p>
       </form>
       {canContinue && !showForm && (
         <div className="card stack">
@@ -163,12 +192,16 @@ export function Chat() {
       )}
       {save.isError && <p role="alert">{t("error.generic")}</p>}
       {!showForm ? (
-        <button type="button" className="btn btn--link" onClick={openForm}>
+        <button type="button" className="btn btn--link" onClick={() => openForm()}>
           {t("chat.useForm")}
         </button>
       ) : (
         <div ref={formRef}>
-          <AssessmentForm initial={formInitial} busy={save.isPending} onSubmit={async (v) => void (await save.mutateAsync(v).catch(() => undefined))} />
+          <AssessmentForm
+            initial={formInitial}
+            busy={save.isPending}
+            onSubmit={async (v) => void (await save.mutateAsync(v).catch(() => undefined))}
+          />
         </div>
       )}
     </StepPage>

@@ -27,12 +27,18 @@ export class ApiError extends Error {
 const CSRF_HEADERS = { "X-Requested-With": "onboarding-app" };
 const DEFAULT_TIMEOUT_MS = 20_000;
 
-type Options = { body?: unknown; form?: FormData; timeoutMs?: number; signal?: AbortSignal };
+type Options = {
+  body?: unknown;
+  form?: FormData;
+  timeoutMs?: number;
+  signal?: AbortSignal;
+};
 
 export async function request<T>(method: string, path: string, opts: Options = {}): Promise<T> {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), opts.timeoutMs ?? DEFAULT_TIMEOUT_MS);
-  opts.signal?.addEventListener("abort", () => controller.abort());
+  const forwardAbort = () => controller.abort();
+  opts.signal?.addEventListener("abort", forwardAbort, { once: true });
   let res: Response;
   try {
     res = await fetch(path, {
@@ -46,6 +52,7 @@ export async function request<T>(method: string, path: string, opts: Options = {
     throw new ApiError(controller.signal.aborted ? 408 : 0, "We couldn't reach the server. Check your connection and try again.");
   } finally {
     clearTimeout(timer);
+    opts.signal?.removeEventListener("abort", forwardAbort);
   }
   if (res.status === 204) return undefined as T;
   const data: unknown = await res.json().catch(() => ({}));

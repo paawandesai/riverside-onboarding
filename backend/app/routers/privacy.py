@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, Response
+from fastapi import APIRouter, Depends, HTTPException, Response
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
@@ -43,7 +43,7 @@ def consent_status(user: User = Depends(current_user), db: Session = Depends(get
 
 @router.post("/consent", response_model=ConsentOut, status_code=201)
 def grant_consent(body: ConsentIn | None = None, user: User = Depends(current_user), db: Session = Depends(get_db)) -> ConsentOut:
-    """Grant consent, or change the optional ID-photo consent on an active grant."""
+    """Grant consent from the consent notice (or re-confirm it with a different photo choice)."""
     photo_scan = body.photo_scan if body else False
     consent = active_consent(db, user.id)
     if consent is None:
@@ -53,6 +53,20 @@ def grant_consent(body: ConsentIn | None = None, user: User = Depends(current_us
     elif consent.photo_scan != photo_scan:
         consent.photo_scan = photo_scan
         audit(db, "photo_consent_granted" if photo_scan else "photo_consent_withdrawn", user.id, user.id)
+    db.commit()
+    return ConsentOut(active=True, version=consent.version, photo_scan=consent.photo_scan)
+
+
+@router.put("/consent/photo", response_model=ConsentOut, responses={409: {"description": "No active consent"}})
+def set_photo_consent(body: ConsentIn, user: User = Depends(current_user), db: Session = Depends(get_db)) -> ConsentOut:
+    """Turn the optional ID-photo consent on or off. Only changes an existing grant; it never creates one,
+    so consent to the notice itself can only come from the consent step that shows it."""
+    consent = active_consent(db, user.id)
+    if consent is None:
+        raise HTTPException(status_code=409, detail="Please review and accept the consent notice first.")
+    if consent.photo_scan != body.photo_scan:
+        consent.photo_scan = body.photo_scan
+        audit(db, "photo_consent_granted" if body.photo_scan else "photo_consent_withdrawn", user.id, user.id)
     db.commit()
     return ConsentOut(active=True, version=consent.version, photo_scan=consent.photo_scan)
 

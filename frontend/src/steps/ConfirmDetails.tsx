@@ -74,11 +74,11 @@ export function ConfirmDetails() {
   }, [extracted]);
 
   useSupportActions((action) => {
-    if (action === "Try again") {
+    if (action === "try_again") {
       navigate("/details");
       return true;
     }
-    return action === "Type it instead" || action === "Check my details";
+    return action === "type_instead" || action === "check_details";
   });
 
   const save = useMutation({

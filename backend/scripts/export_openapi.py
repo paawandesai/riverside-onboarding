@@ -10,7 +10,7 @@ import os
 import sys
 
 # Importing the app needs settings; placeholder values are fine because nothing connects or signs.
-for key in ("SESSION_SECRET", "FIELD_ENCRYPTION_KEY", "DATABASE_URL"):
+for key in ("SESSION_SECRET", "FIELD_ENCRYPTION_KEY", "EMAIL_HMAC_KEY", "DATABASE_URL"):
     os.environ.setdefault(key, "export-only")
 
 from app.main import app  # noqa: E402

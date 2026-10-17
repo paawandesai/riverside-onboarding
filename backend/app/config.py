@@ -9,13 +9,19 @@ class Settings(BaseSettings):
 
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 
-    app_env: str = "development"
+    # Safe by default: Secure cookies and no API docs unless an environment says otherwise.
+    app_env: str = "production"
     session_secret: SecretStr
+    # Comma-separated Fernet keys; the first encrypts, all of them decrypt (for key rotation).
     field_encryption_key: SecretStr
+    # Keys the email lookup hash. Separate from SESSION_SECRET so rotating one doesn't break the other.
+    email_hmac_key: SecretStr
     invite_codes: str = ""
     cors_origins: str = "http://localhost:5173"
     demo_mode: bool = True
     demo_retention_hours: int = 24
+    # Appointment times are generated in the clinic's own zone and shown with its name.
+    clinic_timezone: str = "America/New_York"
 
     database_url: str
     # Managed Postgres (Azure) requires TLS; local and CI databases don't.
@@ -32,6 +38,10 @@ class Settings(BaseSettings):
     static_dir: str = "static"
     tesseract_cmd: str = "tesseract"
     max_upload_mb: int = Field(default=8, ge=1, le=20)
+
+    rate_limits_enabled: bool = True
+    # How many trusted proxies append to X-Forwarded-For (1 behind Azure Container Apps ingress).
+    forwarded_ip_hops: int = Field(default=0, ge=0, le=3)
 
     @property
     def invite_code_set(self) -> set[str]:

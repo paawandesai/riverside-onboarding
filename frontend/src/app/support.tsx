@@ -1,11 +1,11 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode, type RefObject } from "react";
 import { useLocation } from "react-router";
-import { api, type Signals, type SupportContent } from "../api";
+import { api, type Signals, type SupportAction, type SupportContent } from "../api";
 import { track } from "../features/events";
 
 export const IDLE_SECONDS = 45;
 
-type ActionHandler = (action: string) => boolean;
+type ActionHandler = (action: SupportAction) => boolean;
 
 type SupportApi = {
   card: SupportContent | null;
@@ -14,7 +14,7 @@ type SupportApi = {
   /** Show a card the server already chose (e.g. returned with a chat turn). */
   present: (card: SupportContent | null) => void;
   dismiss: () => void;
-  act: (action: string) => void;
+  act: (action: SupportAction) => void;
   setPaused: (paused: boolean) => void;
   register: (handler: ActionHandler | null) => void;
   setGlobalHandler: (handler: ActionHandler) => void;
@@ -50,7 +50,7 @@ export function SupportProvider({ children }: { children: ReactNode }) {
   );
 
   const dismiss = useCallback(() => setCard(null), []);
-  const act = useCallback((action: string) => {
+  const act = useCallback((action: SupportAction) => {
     setCard(null);
     if (stepHandler.current?.(action)) return;
     globalHandler.current?.(action);
@@ -86,7 +86,7 @@ export function useSupport(): SupportApi {
   return ctx;
 }
 
-/** Let the current step handle card actions such as "Try again" or "Type it instead". */
+/** Let the current step handle card actions such as try_again or type_instead. */
 export function useSupportActions(handler: ActionHandler) {
   const { register } = useSupport();
   const ref = useRef(handler);
@@ -101,9 +101,27 @@ export function useSupportActions(handler: ActionHandler) {
 
 const IDLE_STEPS = new Set(["chat", "details", "confirm", "book"]);
 
+// Funnel events only ever name these steps, so ids and mistyped URLs never reach analytics.
+const STEP_IDS: Record<string, string> = {
+  "/": "start",
+  "/account": "account",
+  "/consent": "consent",
+  "/chat": "chat",
+  "/details": "details",
+  "/details/confirm": "confirm",
+  "/book": "book",
+  "/done": "done",
+  "/privacy": "privacy",
+  "/saved": "saved",
+  "/deleted": "deleted",
+  "/front-desk": "front_desk",
+  "/staff": "staff",
+};
+
 export function stepId(pathname: string): string {
-  const id = pathname.replace(/^\//, "").replace(/\//g, "_") || "start";
-  return id === "details_confirm" ? "confirm" : id;
+  const path = pathname.length > 1 ? pathname.replace(/\/+$/, "") : pathname;
+  if (path.startsWith("/staff/")) return "staff_patient";
+  return STEP_IDS[path] ?? "other";
 }
 
 /** One idle timer per step: resets on activity, pauses while hidden or a file picker is open, fires once per step. */

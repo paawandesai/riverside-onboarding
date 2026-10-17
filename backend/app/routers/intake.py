@@ -1,18 +1,21 @@
+import asyncio
 import logging
 import re
 from datetime import UTC, date, datetime
 from typing import Literal
 
-from fastapi import APIRouter, Depends, File, HTTPException, Request, UploadFile
+from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.concurrency import run_in_threadpool
 from pydantic import BaseModel, Field, field_validator
 from sqlalchemy import select
 from sqlalchemy.orm import Session
+from starlette.formparsers import MultiPartParser
 
 from app.config import get_settings
 from app.db import get_db
 from app.logging_config import log_event
 from app.models import Booking, IntakeRecord, User
+from app.ratelimit import check
 from app.security import current_user, decrypt_json, decrypt_str, encrypt_json, encrypt_str
 from app.services import health_state, ocr
 from app.services.chat import assessment_summary
@@ -23,6 +26,12 @@ logger = logging.getLogger("app.intake")
 router = APIRouter(prefix="/api", tags=["intake"])
 
 FIELD_SOURCES = {"ocr_confirmed", "ocr_edited", "manual"}
+# Decoding and OCR take a few hundred MB at peak; two at a time per worker keeps a replica inside its memory.
+_OCR_SLOTS = asyncio.Semaphore(2)
+# Keep uploaded parts in memory (up to the largest allowed upload) so a photo never lands in a temp file.
+# The body-size middleware refuses anything larger before parsing starts.
+MultiPartParser.spool_max_size = 21 * 1024 * 1024
+_MANUAL_ENTRY = "We couldn't read photos right now. Please type your details instead."
 
 
 def require_consent(user: User = Depends(current_user), db: Session = Depends(get_db)) -> User:
@@ -60,33 +69,64 @@ class ExtractOut(BaseModel):
     image_retained: bool = False
 
 
-@router.post("/documents/extract", response_model=ExtractOut)
-async def extract_document(
-    request: Request,
-    file: UploadFile = File(...),
-    user: User = Depends(require_photo_consent),
-) -> ExtractOut:
-    """Read name, DOB and address from an ID photo. The image is processed in memory and discarded."""
-    max_bytes = get_settings().max_upload_mb * 1024 * 1024
-    data = await file.read(max_bytes + 1)
-    try:
-        # CPU-bound work runs off the event loop so one upload can't stall other requests.
-        clean = await run_in_threadpool(validate_and_clean, data, max_bytes)
-    except UploadRejected as exc:
-        log_event(logger, "upload_rejected", component="ocr", outcome="rejected", user_id=user.id)
-        raise HTTPException(status_code=422, detail=str(exc)) from None
-    finally:
-        del data
+_UPLOAD_DOC = {
+    "requestBody": {
+        "required": True,
+        "content": {
+            "multipart/form-data": {
+                "schema": {"type": "object", "required": ["file"], "properties": {"file": {"type": "string", "format": "binary"}}}
+            }
+        },
+    }
+}
 
+
+async def _read_photo(request: Request, max_bytes: int) -> bytes:
+    """Read the uploaded photo into memory, only after the caller is authenticated and has consented.
+
+    The body-size middleware has already refused anything over the limit, and the parser keeps parts
+    of that size in memory, so the photo is never written to a temporary file.
+    """
     try:
-        result = await run_in_threadpool(ocr.extract_fields, clean.image)
-        health_state.record_success("ocr")
-    except ocr.OcrUnavailable:
-        health_state.record_failure("ocr")
-        log_event(logger, "ocr_unavailable", logging.ERROR, component="ocr", outcome="error", user_id=user.id)
-        raise HTTPException(status_code=503, detail="We couldn't read photos right now. Please type your details instead.") from None
+        form = await request.form(max_files=1, max_fields=2, max_part_size=max_bytes + 1)
+    except Exception:  # noqa: BLE001 - malformed multipart bodies get the same friendly answer
+        raise HTTPException(status_code=422, detail="Please choose a photo of your ID.") from None
+    try:
+        upload = form.get("file")
+        if upload is None or isinstance(upload, str):
+            raise HTTPException(status_code=422, detail="Please choose a photo of your ID.")
+        return await upload.read(max_bytes + 1)
     finally:
-        clean.image.close()
+        await form.close()
+
+
+@router.post("/documents/extract", response_model=ExtractOut, openapi_extra=_UPLOAD_DOC)
+async def extract_document(request: Request, user: User = Depends(require_photo_consent)) -> ExtractOut:
+    """Read name, DOB and address from an ID photo. The image is processed in memory and discarded."""
+    check("upload", user.id, 10, 60)
+    max_bytes = get_settings().max_upload_mb * 1024 * 1024
+    data = await _read_photo(request, max_bytes)
+    async with _OCR_SLOTS:
+        try:
+            # CPU-bound work runs off the event loop so one upload can't stall other requests.
+            clean = await run_in_threadpool(validate_and_clean, data, max_bytes)
+        except UploadRejected as exc:
+            log_event(logger, "upload_rejected", component="ocr", outcome="rejected", user_id=user.id)
+            raise HTTPException(status_code=422, detail=str(exc)) from None
+        finally:
+            del data
+
+        try:
+            result = await run_in_threadpool(ocr.extract_fields, clean.image)
+            health_state.record_success("ocr")
+        except Exception as exc:  # noqa: BLE001 - OCR trouble of any kind (engine missing, out of memory) means "type it"
+            health_state.record_failure("ocr")
+            log_event(
+                logger, "ocr_unavailable", logging.ERROR, component="ocr", outcome="error", user_id=user.id, error_type=type(exc).__name__
+            )
+            raise HTTPException(status_code=503, detail=_MANUAL_ENTRY) from None
+        finally:
+            clean.image.close()
 
     found = [k for k, f in result.fields.items() if f.value]
     missing = [k for k, f in result.fields.items() if not f.value]

@@ -209,11 +209,20 @@ fieldset {
   cursor: pointer;
   font-weight: 600;
 }
+/* Selected chips change shape and fill, not just colour (WCAG 1.4.1): solid accent, contrasting text, a tick. */
 .chip[aria-pressed="true"],
 .chip[aria-checked="true"] {
-  background: var(--accent-soft);
+  background: var(--accent);
   border-color: var(--accent);
-  color: var(--ink);
+  color: var(--accent-ink);
+  box-shadow:
+    0 0 0 2px var(--surface),
+    0 0 0 4px var(--accent);
+}
+.chip[aria-pressed="true"]::before,
+.chip[aria-checked="true"]::before {
+  content: "✓ ";
+  font-weight: 700;
 }
 .chip--highlight {
   border-color: var(--accent);

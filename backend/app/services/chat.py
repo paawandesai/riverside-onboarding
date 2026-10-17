@@ -7,9 +7,12 @@ Order of authority, highest first:
 When the model is unavailable, a rule-based classifier keeps the flow working.
 """
 
+import hashlib
+import hmac
 import re
 from dataclasses import dataclass, field
 
+from app.config import get_settings
 from app.services import llm, support
 
 MAX_TURNS = 20
@@ -53,10 +56,25 @@ _IN_PERSON = re.compile(r"\b(in[- ]person|in the clinic|come in|office visit)\b"
 _DURATION = re.compile(
     r"\b(?:for|since|about|past)\s+((?:a|an|one|two|three|four|five|six|\d+)\s+(?:day|week|month|year)s?|yesterday|last \w+)\b", re.I
 )
-_URL = re.compile(r"(https?://\S+|www\.\S+|!\[[^\]]*\]\([^)]*\)|\[[^\]]*\]\([^)]*\))", re.I)
+# Links of any shape: schemes (including defanged hxxp), www., markdown links and images, and bare
+# domains such as evil.example/login. A stripped dotted word is a small price for never showing a link.
+_URL = re.compile(
+    r"(\b(?:h[tx]{2}ps?|ftp)://\S+|\bwww\.\S+|!\[[^\]]*\]\([^)]*\)|\[[^\]]*\]\([^)]*\)|"
+    r"\b(?:[a-z0-9-]+\.)+[a-z]{2,24}\b(?:/\S*)?)",
+    re.I,
+)
+# Any wording that claims an appointment was made, changed or cancelled. Only the scheduling API can do
+# that, so a reply matching this is replaced with a fixed one.
 _COMMITMENT = re.compile(
-    r"\b(?:i(?:'ve| have)?|we(?:'ve| have)?)\s+(?:booked|scheduled|confirmed|cancel+ed|rescheduled|reserved|moved)\b|"
-    r"\byour (?:appointment|visit) (?:is|has been) (?:booked|confirmed|scheduled|cancel+ed|moved|set)\b",
+    r"\b(?:i|we)(?:'ve| have| had|'ll| will|'m| am)?\s+(?:just\s+|now\s+|already\s+|(?:gone|went) ahead and\s+)?"
+    r"(?:booked|scheduled|confirmed|cancel+ed|rescheduled|reserved|moved|set up|put you|locked)\b|"
+    r"\b(?:went|gone) ahead and\b|"
+    r"\b(?:booked|scheduled|reserved|confirmed|rescheduled|moved) you\b|"
+    r"\byou(?:'re|r| are)\s+(?:all\s+)?(?:set|booked|confirmed|scheduled)\b|"
+    r"\b(?:appointment|visit|booking|slot)\s+(?:is|has been|was|'s|is now|has now been)\s+(?:now\s+|all\s+)?"
+    r"(?:booked|confirmed|scheduled|cancel+ed|moved|set|reserved|rescheduled|locked in)\b|"
+    r"(?:^|[.!]\s*)(?:booked|scheduled|confirmed|done)[!.,]?\s+(?:you|for|at|on)\b|"
+    r"\bsee you (?:on |at |next |tomorrow|monday|tuesday|wednesday|thursday|friday|saturday|sunday)",
     re.I,
 )
 
@@ -71,7 +89,7 @@ SAFETY_REPLY = (
     "I'm sorry you're going through this. If you're in danger or thinking about hurting yourself, "
     "please call or text 988 now, or call 911. You can pause sign-up any time."
 )
-MANUAL_HINT = "The assistant is temporarily unavailable. You can keep going with the form below; nothing is lost."
+MANUAL_HINT = "The assistant is temporarily unavailable. You can keep going with the form below; what you've typed stays on this page."
 
 
 @dataclass
@@ -88,6 +106,31 @@ class ChatResult:
 
 class ChatInputError(ValueError):
     pass
+
+
+def _reply_key() -> bytes:
+    return hmac.new(get_settings().session_secret.get_secret_value().encode(), b"chat-reply-signature", hashlib.sha256).digest()
+
+
+def sign_reply(user_id: str, reply: str) -> str:
+    """A signature the browser sends back with each assistant turn, so it can't invent earlier replies."""
+    return hmac.new(_reply_key(), f"{user_id}\n{reply}".encode(), hashlib.sha256).hexdigest()
+
+
+def trusted_history(turns: list[dict], user_id: str) -> list[dict]:
+    """Keep patient turns and only those assistant turns this server actually sent to this user.
+
+    The browser holds the conversation (transcripts aren't stored), so an assistant turn without a
+    valid signature is a forgery attempt or a stale copy; either way it never reaches the model.
+    """
+    kept = []
+    for turn in turns:
+        if turn.get("role") == "assistant":
+            sig, content = turn.get("sig"), turn.get("content")
+            if not isinstance(sig, str) or not isinstance(content, str) or not hmac.compare_digest(sig, sign_reply(user_id, content)):
+                continue
+        kept.append({"role": turn.get("role"), "content": turn.get("content")})
+    return kept
 
 
 def validate_history(history: list[dict]) -> list[dict]:
@@ -184,6 +227,8 @@ def run_turn(history: list[dict]) -> ChatResult:
     if distress:
         result.support = support.content_for(support.Signals(distress=True))
     if intent == "request_reschedule":
+        # Never free model text here: a reschedule reply is where a false "I've moved it" would do harm.
+        result.reply = FALLBACK_REPLIES["request_reschedule"]
         result.ui_action = "open_scheduling"
     return result
 

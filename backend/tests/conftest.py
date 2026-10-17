@@ -8,6 +8,9 @@ os.environ.setdefault("APP_ENV", "test")
 # Fresh random secrets per test run, so no key material lives in the repo.
 os.environ.setdefault("SESSION_SECRET", secrets.token_urlsafe(48))
 os.environ.setdefault("FIELD_ENCRYPTION_KEY", Fernet.generate_key().decode())
+os.environ.setdefault("EMAIL_HMAC_KEY", secrets.token_urlsafe(48))
+# Tests sign up many accounts from one address; the limiter has its own tests that switch it on.
+os.environ.setdefault("RATE_LIMITS_ENABLED", "false")
 os.environ.setdefault("INVITE_CODES", "test-invite")
 os.environ.setdefault("DATABASE_URL", "postgresql+pg8000://onboarding:localdev@localhost:5432/onboarding_test")
 os.environ["ANTHROPIC_API_KEY"] = ""  # tests never call the real provider

@@ -9,14 +9,25 @@ import { bookingIcs } from "../features/ics";
 import { t } from "../i18n";
 
 export function Done() {
-  const bookings = useQuery({ queryKey: ["bookings"], queryFn: api.myBookings });
-  const intake = useQuery({ queryKey: ["intake"], queryFn: api.intake, retry: false });
+  const bookings = useQuery({
+    queryKey: ["bookings"],
+    queryFn: api.myBookings,
+  });
+  const intake = useQuery({
+    queryKey: ["intake"],
+    queryFn: api.intake,
+    retry: false,
+  });
   const booking = bookings.data?.[0];
   const [icsUrl, setIcsUrl] = useState<string | null>(null);
 
   useEffect(() => {
     if (!booking) return;
-    const url = URL.createObjectURL(new Blob([bookingIcs(booking, t("clinic.name"), t("clinic.address"))], { type: "text/calendar" }));
+    const url = URL.createObjectURL(
+      new Blob([bookingIcs(booking, t("clinic.name"), t("clinic.address"))], {
+        type: "text/calendar",
+      }),
+    );
     // eslint-disable-next-line react-hooks/set-state-in-effect -- the object URL must be created and revoked with the booking
     setIcsUrl(url);
     return () => URL.revokeObjectURL(url);
@@ -32,7 +43,8 @@ export function Done() {
       </StepPage>
     );
 
-  const summaryLines = intake.data?.assessment_summary?.split("\n").slice(1) ?? [];
+  // The summary's first line is its "non-binding" header, shown separately below as the AI note.
+  const summaryLines = (intake.data?.assessment_summary?.split("\n") ?? []).filter((l) => l.includes(":"));
 
   return (
     <StepPage title={t("done.title")}>
@@ -73,8 +85,8 @@ export function Done() {
             {t("done.told")} <span className="ai-badge">{t("chat.aiLabel")}</span>
           </h2>
           <ul>
-            {summaryLines.map((l) => (
-              <li key={l}>{l}</li>
+            {summaryLines.map((l, i) => (
+              <li key={i}>{l}</li>
             ))}
           </ul>
           <p className="muted small">{t("done.aiNote")}</p>

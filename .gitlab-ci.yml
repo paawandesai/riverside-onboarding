@@ -37,10 +37,12 @@ backend:
     paths: [.cache/pip]
   before_script:
     - apt-get update && apt-get install -y --no-install-recommends tesseract-ocr tesseract-ocr-eng && rm -rf /var/lib/apt/lists/*
-    - cd backend && pip install -r requirements-dev.txt
+    # Runtime packages from the hash-pinned lock (what the image ships), then the test tools.
+    - cd backend && pip install --require-hashes --no-deps -r requirements.lock && pip install -r requirements-dev.txt
     # Throwaway per-job keys, generated here so none live in the repo or CI settings.
     - export SESSION_SECRET="$(python -c 'import secrets;print(secrets.token_urlsafe(48))')"
     - export FIELD_ENCRYPTION_KEY="$(python -c 'from cryptography.fernet import Fernet;print(Fernet.generate_key().decode())')"
+    - export EMAIL_HMAC_KEY="$(python -c 'import secrets;print(secrets.token_urlsafe(48))')"
   script:
     - ruff check .
     - ruff format --check .
@@ -95,7 +97,7 @@ e2e:
       paths: [.cache/pip]
   before_script:
     - apt-get update && apt-get install -y --no-install-recommends python3-venv tesseract-ocr tesseract-ocr-eng && rm -rf /var/lib/apt/lists/*
-    - python3 -m venv backend/.venv && backend/.venv/bin/pip install -r backend/requirements.txt
+    - python3 -m venv backend/.venv && backend/.venv/bin/pip install --require-hashes --no-deps -r backend/requirements.lock
     - cd frontend && npm ci --no-audit --no-fund && npm run build
   script:
     # Real API, real database, real OCR; only the chat call is broken on purpose in one test.
@@ -112,7 +114,7 @@ licenses:
     key: { files: [backend/requirements.lock] }
     paths: [.cache/pip]
   before_script:
-    - python -m venv backend/.venv && backend/.venv/bin/pip install -r backend/requirements-dev.txt
+    - python -m venv backend/.venv && backend/.venv/bin/pip install --require-hashes --no-deps -r backend/requirements.lock && backend/.venv/bin/pip install -r backend/requirements-dev.txt
   script:
     # Regenerate and fail if a shipped package has a disallowed license or LICENSES.md is stale.
     - backend/.venv/bin/python scripts/license_audit.py --check
@@ -136,7 +138,7 @@ ocr-eval:
     paths: [.cache/pip]
   before_script:
     - apt-get update && apt-get install -y --no-install-recommends tesseract-ocr tesseract-ocr-eng && rm -rf /var/lib/apt/lists/*
-    - pip install -r backend/requirements.txt
+    - pip install --require-hashes --no-deps -r backend/requirements.lock
   script:
     # Rule fallback + OCR only; the Claude path is measured manually because it costs API credit.
     - cd backend && python ../eval/run_eval.py

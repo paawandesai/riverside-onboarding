@@ -60,13 +60,14 @@ test("distress shows the supportive card with crisis line from the server", asyn
         intent: "express_distress",
         reply: "I'm sorry you're going through this. Please call or text 988.",
         fields: {},
-        support: { trigger: "distress", title: "It sounds like this is a lot right now.", body: "Call or text 988.", actions: ["Talk to a person"], urgent: true },
+        support: { trigger: "distress", title: "It sounds like this is a lot right now.", body: "Call or text 988.", actions: [{ id: "talk_to_person", label: "Talk to a person" }], urgent: true },
       }),
     },
   });
   renderApp("/chat");
   await userEvent.type(await screen.findByLabelText("Message"), "I can't go on{Enter}");
-  const card = await screen.findByRole("complementary", { name: /a lot right now/ });
+  // Urgent content is an alert (announced at once) and takes focus.
+  const card = await screen.findByRole("alert", { name: /a lot right now/ });
   expect(card).toHaveTextContent("988");
   await userEvent.click(within(card).getByRole("button", { name: "Talk to a person" }));
   expect(await screen.findByRole("dialog", { name: "Help" })).toHaveTextContent("555-0142");
@@ -78,7 +79,7 @@ test("when the assistant fails, a card offers retry or a form prefilled with wha
     "GET /api/auth/me": { body: ME },
     "POST /api/chat": () => (++attempts === 1 ? { body: reply({ fields: { reason_for_visit: "back pain" } }) } : { status: 502, body: {} }),
     "POST /api/support/evaluate": {
-      body: { content: { trigger: "llm_unavailable", title: "I'm having trouble responding.", body: "...", actions: ["Try again", "Continue with a form"], urgent: false } },
+      body: { content: { trigger: "llm_unavailable", title: "I'm having trouble responding.", body: "...", actions: [{ id: "try_again", label: "Try again" }, { id: "use_form", label: "Continue with a form" }], urgent: false } },
     },
   });
   renderApp("/chat");
@@ -97,7 +98,7 @@ test("if the assistant fails before extracting anything, the form starts with th
     "GET /api/auth/me": { body: ME },
     "POST /api/chat": { status: 502, body: {} },
     "POST /api/support/evaluate": {
-      body: { content: { trigger: "llm_unavailable", title: "I'm having trouble responding.", body: "...", actions: ["Try again", "Continue with a form"], urgent: false } },
+      body: { content: { trigger: "llm_unavailable", title: "I'm having trouble responding.", body: "...", actions: [{ id: "try_again", label: "Try again" }, { id: "use_form", label: "Continue with a form" }], urgent: false } },
     },
   });
   renderApp("/chat");

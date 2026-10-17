@@ -1,7 +1,7 @@
 .PHONY: setup db seed staff api web test e2e lint eval load licenses
 
 setup:            ## install backend + frontend deps and git hooks
-	cd backend && python3 -m venv .venv && .venv/bin/pip install -r requirements-dev.txt
+	cd backend && python3 -m venv .venv && .venv/bin/pip install --require-hashes --no-deps -r requirements.lock && .venv/bin/pip install -r requirements-dev.txt
 	cd frontend && npm ci
 	pre-commit install
 

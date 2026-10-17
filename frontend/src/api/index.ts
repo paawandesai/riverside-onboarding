@@ -13,6 +13,7 @@ export type ChatTurn = Schemas["ChatTurn"];
 export type ChatResult = Schemas["ChatOut"];
 export type AssessmentFields = Schemas["ChatFieldsOut"];
 export type SupportContent = Schemas["SupportCardOut"];
+export type SupportAction = Schemas["SupportActionOut"]["id"];
 export type Signals = Schemas["SignalsIn"];
 export type Slot = Schemas["SlotOut"];
 export type Booking = Schemas["BookingOut"];
@@ -34,22 +35,35 @@ export const api = {
   consentText: () => request<ConsentText>("GET", "/api/consent/text"),
   consent: () => request<Consent>("GET", "/api/consent"),
   grantConsent: (photo_scan: boolean) => request<Consent>("POST", "/api/consent", { body: { photo_scan } }),
+  // Turns the optional ID-photo consent on or off; it never grants consent to the notice itself.
+  setPhotoConsent: (photo_scan: boolean) => request<Consent>("PUT", "/api/consent/photo", { body: { photo_scan } }),
   revokeConsent: () => request<Consent>("POST", "/api/consent/revoke"),
   extract: (file: File) => {
     const form = new FormData();
     form.append("file", file);
-    return request<ExtractResult>("POST", "/api/documents/extract", { form, timeoutMs: 30_000 });
+    return request<ExtractResult>("POST", "/api/documents/extract", {
+      form,
+      timeoutMs: 30_000,
+    });
   },
   intake: () => request<Intake>("GET", "/api/intake"),
   saveIdentity: (body: Schemas["IdentityIn"]) => request<Intake>("PUT", "/api/intake/identity", { body }),
   saveAssessment: (body: Schemas["AssessmentIn"]) => request<Intake>("PUT", "/api/intake/assessment", { body }),
   chat: (messages: ChatTurn[], signal?: AbortSignal) =>
-    request<ChatResult>("POST", "/api/chat", { body: { messages }, timeoutMs: CHAT_TIMEOUT_MS, signal }),
-  slots: (visitType?: string) => request<Slot[]>("GET", `/api/slots${visitType ? `?visit_type=${visitType}` : ""}`),
+    request<ChatResult>("POST", "/api/chat", {
+      body: { messages },
+      timeoutMs: CHAT_TIMEOUT_MS,
+      signal,
+    }),
+  slots: (visitType?: string) =>
+    request<Slot[]>("GET", `/api/slots${visitType ? `?${new URLSearchParams({ visit_type: visitType })}` : ""}`),
   book: (slotId: number) => request<Booking>("POST", "/api/bookings", { body: { slot_id: slotId } }),
   myBookings: () => request<Booking[]>("GET", "/api/bookings/mine"),
   cancelBooking: (id: string) => request<void>("POST", `/api/bookings/${id}/cancel`),
-  support: (signals: Partial<Signals>) => request<Schemas["SupportOut"]>("POST", "/api/support/evaluate", { body: signals }),
+  support: (signals: Partial<Signals>) =>
+    request<Schemas["SupportOut"]>("POST", "/api/support/evaluate", {
+      body: signals,
+    }),
   deleteData: () => request<void>("DELETE", "/api/me/data"),
   deleteAccount: () => request<void>("DELETE", "/api/me"),
   staffSchedule: () => request<ScheduleItem[]>("GET", "/api/staff/schedule"),

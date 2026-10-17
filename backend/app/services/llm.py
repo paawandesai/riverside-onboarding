@@ -7,6 +7,7 @@ The model has no tools; its JSON output is validated server-side before anything
 
 import json
 import logging
+import re
 import time
 from dataclasses import dataclass
 
@@ -117,9 +118,18 @@ def verify_model_at_startup() -> None:
     log_event(logger, "llm_model_verified", component="llm", model=settings.anthropic_model)
 
 
+_EMAIL = re.compile(r"\b[\w.+-]+@[\w-]+(?:\.[\w-]+)+\b")
+_PHONE = re.compile(r"(?<!\d)(?:\+?1[\s.-]?)?\(?\d{3}\)?[\s.-]?\d{3}[\s.-]?\d{4}(?!\d)")
+
+
+def redact(text: str) -> str:
+    """Drop email addresses and phone numbers a patient types; the assistant never needs them."""
+    return _PHONE.sub("[phone removed]", _EMAIL.sub("[email removed]", text))
+
+
 def _wrap(text: str) -> str:
     # Neutralize any attempt to close the data tag early.
-    safe = text.replace("<", "‹").replace(">", "›")
+    safe = redact(text).replace("<", "‹").replace(">", "›")
     return f"<patient_message>\n{safe}\n</patient_message>"
 
 
@@ -142,12 +152,12 @@ def classify_turn(history: list[dict]) -> LlmTurn:
     try:
         response = _get_client().messages.create(
             model=settings.anthropic_model,
-            max_tokens=1024,
+            max_tokens=2048,
             system=SYSTEM_PROMPT,
             messages=build_messages(history),
             output_config={"effort": settings.anthropic_effort, "format": {"type": "json_schema", "schema": OUTPUT_SCHEMA}},
         )
-    except (anthropic.APITimeoutError, anthropic.APIConnectionError, anthropic.RateLimitError, anthropic.APIStatusError) as exc:
+    except anthropic.APIError as exc:  # timeouts, connection, status and response-validation errors alike
         health_state.record_failure("llm")
         log_event(logger, "llm_call_failed", logging.WARNING, component="llm", error_type=type(exc).__name__)
         raise LlmUnavailable(type(exc).__name__) from exc
@@ -162,6 +172,9 @@ def classify_turn(history: list[dict]) -> LlmTurn:
     except json.JSONDecodeError as exc:
         health_state.record_failure("llm")
         raise LlmUnavailable("invalid_json") from exc
+    if not isinstance(data, dict) or not isinstance(data.get("intent"), str) or not isinstance(data.get("reply", ""), str):
+        health_state.record_failure("llm")
+        raise LlmUnavailable("invalid_shape")
 
     health_state.record_success("llm")
     log_event(
@@ -174,6 +187,10 @@ def classify_turn(history: list[dict]) -> LlmTurn:
     )
     return LlmTurn(
         intent=data.get("intent", ""),
-        fields={k: data.get(k) for k in ("reason_for_visit", "symptom_duration", "visit_type_preference", "accessibility_needs")},
+        # Anything that isn't a string is dropped here; sanitize_fields checks values further.
+        fields={
+            k: v if isinstance(v := data.get(k), str) else None
+            for k in ("reason_for_visit", "symptom_duration", "visit_type_preference", "accessibility_needs")
+        },
         reply=data.get("reply", ""),
     )

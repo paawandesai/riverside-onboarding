@@ -19,11 +19,11 @@ const extracted = {
 };
 
 test("without photo consent, ID scanning is offered as opt-in and typing works", async () => {
-  const calls = mockFetch({ "GET /api/auth/me": { body: ME }, ...consent(false), "POST /api/consent": { status: 201, body: {} } });
+  const calls = mockFetch({ "GET /api/auth/me": { body: ME }, ...consent(false), "PUT /api/consent/photo": { body: { active: true, version: "v2", photo_scan: true } } });
   const { router } = renderApp("/details");
   expect(await screen.findByText(/ID scanning is off/)).toBeInTheDocument();
   await userEvent.click(screen.getByRole("button", { name: "Turn on ID scanning" }));
-  expect(calls.find((c) => c.method === "POST" && c.url === "/api/consent")!.body).toEqual({ photo_scan: true });
+  expect(calls.find((c) => c.method === "PUT" && c.url === "/api/consent/photo")!.body).toEqual({ photo_scan: true });
   await userEvent.click(screen.getByRole("button", { name: "Type it instead" }));
   expect(router.state.location.pathname).toBe("/details/confirm");
   expect(await screen.findByRole("heading", { name: "Type your details" })).toBeInTheDocument();
@@ -36,7 +36,7 @@ test("client rejects the wrong file type before upload", async () => {
   expect(await axeViolations(container)).toEqual([]);
   const input = container.querySelector<HTMLInputElement>("#id-photo")!;
   await userEvent.upload(input, new File(["%PDF"], "id.pdf", { type: "application/pdf" }), { applyAccept: false });
-  expect(await screen.findByRole("alert")).toHaveTextContent(/isn't a JPG, PNG or HEIC/);
+  expect(await screen.findByRole("alert")).toHaveTextContent(/isn't a JPG, PNG, WebP or HEIC/);
   expect(calls.some((c) => c.url === "/api/documents/extract")).toBe(false);
 });
 
@@ -85,7 +85,7 @@ test("an unreadable photo leads to a supportive card and the typed form, never a
     ...consent(true),
     "POST /api/documents/extract": { status: 422, body: { detail: "That file isn't a supported image." } },
     "POST /api/support/evaluate": {
-      body: { content: { trigger: "upload_failed", title: "That photo was hard to read. That's okay.", body: "...", actions: ["Try again", "Type it instead"], urgent: false } },
+      body: { content: { trigger: "upload_failed", title: "That photo was hard to read. That's okay.", body: "...", actions: [{ id: "try_again", label: "Try again" }, { id: "type_instead", label: "Type it instead" }], urgent: false } },
     },
   });
   const { container, router } = renderApp("/details");

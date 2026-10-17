@@ -76,8 +76,8 @@ function Shell() {
 
   useEffect(() => {
     support.setGlobalHandler((action) => {
-      if (action === "Talk to a person") setHelpOpen(true);
-      else if (action === "Save and finish later") void saveAndLeave();
+      if (action === "talk_to_person") setHelpOpen(true);
+      else if (action === "save_and_leave") void saveAndLeave();
       return true;
     });
   });

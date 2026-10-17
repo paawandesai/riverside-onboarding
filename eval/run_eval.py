@@ -23,8 +23,9 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT / "backend"))
-os.environ.setdefault("SESSION_SECRET", "eval-only")
+os.environ.setdefault("SESSION_SECRET", "eval-only-" + "x" * 32)
 os.environ.setdefault("FIELD_ENCRYPTION_KEY", "unused-in-eval")
+os.environ.setdefault("EMAIL_HMAC_KEY", "eval-only-email-" + "y" * 32)
 os.environ.setdefault("DATABASE_URL", "postgresql+pg8000://unused@localhost/unused")
 
 from PIL import Image, ImageDraw, ImageFont  # noqa: E402

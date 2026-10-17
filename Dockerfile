@@ -19,13 +19,15 @@ RUN apt-get update \
  && apt-get install -y --no-install-recommends tesseract-ocr tesseract-ocr-eng \
  && rm -rf /var/lib/apt/lists/*
 WORKDIR /app
-COPY backend/requirements.txt ./
+# Exact versions with hashes: the image gets the same packages CI tested and the licence audit saw.
+COPY backend/requirements.lock ./
 RUN --mount=type=secret,id=proxy_ca,required=false \
     if [ -f /run/secrets/proxy_ca ]; then export PIP_CERT=/run/secrets/proxy_ca; fi; \
-    pip install -r requirements.txt
+    pip install --require-hashes --no-deps -r requirements.lock
 COPY backend/ ./
 COPY --from=web /web/dist ./static
-RUN useradd --system --uid 10001 app && chown -R app /app
+# Code stays root-owned and read-only to the app user; it needs no writable paths.
+RUN useradd --system --uid 10001 app
 USER app
 EXPOSE 8000
 HEALTHCHECK --interval=30s --timeout=5s CMD python -c "import urllib.request;urllib.request.urlopen('http://127.0.0.1:8000/api/health')" || exit 1

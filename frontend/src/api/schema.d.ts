@@ -30,7 +30,10 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Logout */
+        /**
+         * Logout
+         * @description Sign out everywhere: tokens issued before now stop working, not just this browser's cookie.
+         */
         post: operations["logout_api_auth_logout_post"];
         delete?: never;
         options?: never;
@@ -155,9 +158,30 @@ export interface paths {
         put?: never;
         /**
          * Grant Consent
-         * @description Grant consent, or change the optional ID-photo consent on an active grant.
+         * @description Grant consent from the consent notice (or re-confirm it with a different photo choice).
          */
         post: operations["grant_consent_api_consent_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/consent/photo": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Set Photo Consent
+         * @description Turn the optional ID-photo consent on or off. Only changes an existing grant; it never creates one,
+         *     so consent to the notice itself can only come from the consent step that shows it.
+         */
+        put: operations["set_photo_consent_api_consent_photo_put"];
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -469,11 +493,6 @@ export interface components {
             /** Visit Type Preference */
             visit_type_preference?: string | null;
         };
-        /** Body_extract_document_api_documents_extract_post */
-        Body_extract_document_api_documents_extract_post: {
-            /** File */
-            file: string;
-        };
         /** BookIn */
         BookIn: {
             /** Slot Id */
@@ -521,6 +540,8 @@ export interface components {
             notice: string | null;
             /** Reply */
             reply: string;
+            /** Reply Sig */
+            reply_sig: string;
             support: components["schemas"]["SupportCardOut"] | null;
             /** Ui Action */
             ui_action: string | null;
@@ -531,6 +552,8 @@ export interface components {
             content: string;
             /** Role */
             role: string;
+            /** Sig */
+            sig?: string | null;
         };
         /** ConflictOut */
         ConflictOut: {
@@ -784,10 +807,20 @@ export interface components {
             /** Patient Id */
             patient_id: string;
         };
+        /** SupportActionOut */
+        SupportActionOut: {
+            /**
+             * Id
+             * @enum {string}
+             */
+            id: "talk_to_person" | "continue" | "try_again" | "use_form" | "type_instead" | "check_details" | "see_other_times" | "save_and_leave";
+            /** Label */
+            label: string;
+        };
         /** SupportCardOut */
         SupportCardOut: {
             /** Actions */
-            actions: string[];
+            actions: components["schemas"]["SupportActionOut"][];
             /** Body */
             body: string;
             /** Title */
@@ -1104,6 +1137,46 @@ export interface operations {
             };
         };
     };
+    set_photo_consent_api_consent_photo_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ConsentIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ConsentOut"];
+                };
+            };
+            /** @description No active consent */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     revoke_consent_api_consent_revoke_post: {
         parameters: {
             query?: never;
@@ -1153,7 +1226,10 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "multipart/form-data": components["schemas"]["Body_extract_document_api_documents_extract_post"];
+                "multipart/form-data": {
+                    /** Format: binary */
+                    file: string;
+                };
             };
         };
         responses: {
@@ -1164,15 +1240,6 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ExtractOut"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };

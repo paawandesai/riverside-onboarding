@@ -3,7 +3,8 @@ import userEvent from "@testing-library/user-event";
 import { mockFetch } from "../test-utils/mockFetch";
 import { axeViolations, ME, renderApp } from "../test-utils/render";
 
-const day = (d: number, h: number, m = 0) => new Date(2030, 0, d, h, m).toISOString();
+// Slots are shown in clinic time (US Eastern; UTC-5 in January), whatever the test machine's zone.
+const day = (d: number, h: number, m = 0) => new Date(Date.UTC(2030, 0, d, h + 5, m)).toISOString();
 const slot = (id: number, starts_at: string, visit_type = "in_person") => ({ id, starts_at, duration_minutes: 40, visit_type, clinician_label: "Dr. Rowan (fictional)" });
 const SLOTS = [slot(1, day(7, 9)), slot(2, day(7, 10)), slot(3, day(7, 11)), slot(4, day(8, 9)), slot(5, day(8, 9, 40))];
 const INTAKE = {
@@ -55,7 +56,7 @@ test("a taken time is reported inline with the closest times; a second conflict 
     "GET /api/bookings/mine": { body: [] },
     "POST /api/bookings": { status: 409, body: { detail: "Someone just booked that time.", alternatives: [SLOTS[0], SLOTS[2], SLOTS[3]] } },
     "POST /api/support/evaluate": {
-      body: { content: { trigger: "booking_conflict", title: "Times are filling fast.", body: "...", actions: ["See other times"], urgent: false } },
+      body: { content: { trigger: "booking_conflict", title: "Times are filling fast.", body: "...", actions: [{ id: "see_other_times", label: "See other times" }], urgent: false } },
     },
   });
   renderApp("/book");
@@ -95,12 +96,12 @@ test("withdrawing consent purges and photo consent can be switched off", async (
   const calls = mockFetch({
     "GET /api/auth/me": { body: ME },
     "GET /api/consent": { body: { active: true, version: "2026-10-v2", photo_scan: true } },
-    "POST /api/consent": { status: 201, body: { active: true, version: "2026-10-v2", photo_scan: false } },
+    "PUT /api/consent/photo": { body: { active: true, version: "2026-10-v2", photo_scan: false } },
     "POST /api/consent/revoke": { body: { active: false, version: null, photo_scan: false } },
   });
   const { router } = renderApp("/privacy");
   await userEvent.click(await screen.findByRole("button", { name: "Turn off ID scanning" }));
-  expect(calls.find((c) => c.method === "POST" && c.url === "/api/consent")!.body).toEqual({ photo_scan: false });
+  expect(calls.find((c) => c.method === "PUT" && c.url === "/api/consent/photo")!.body).toEqual({ photo_scan: false });
   await userEvent.click(screen.getByRole("button", { name: /withdraw consent/i }));
   await userEvent.click(within(await screen.findByRole("dialog")).getByRole("button", { name: "Yes, delete" }));
   await waitFor(() => expect(router.state.location.pathname).toBe("/deleted"));
@@ -111,7 +112,7 @@ test("a long pause on a step shows the take-your-time card once", async () => {
   const calls = mockFetch({
     "GET /api/auth/me": { body: ME },
     "POST /api/support/evaluate": {
-      body: { content: { trigger: "long_pause", title: "Take your time.", body: "Saved.", actions: ["Continue", "Save and finish later"], urgent: false } },
+      body: { content: { trigger: "long_pause", title: "Take your time.", body: "Saved.", actions: [{ id: "continue", label: "Continue" }, { id: "save_and_leave", label: "Save and finish later" }], urgent: false } },
     },
     "POST /api/auth/logout": { status: 204 },
   });

@@ -1,32 +1,59 @@
-"""Scheduled purge for the public demo: delete user data older than DEMO_RETENTION_HOURS.
+"""Scheduled purge for the public demo: delete data older than DEMO_RETENTION_HOURS.
 
-Runs as a scheduled job (see infra/terraform). Keeps the demo user account itself and the
-audit log (ids and action names only).
+Runs hourly as a scheduled job (see infra/terraform):
+* accounts created more than DEMO_RETENTION_HOURS ago are deleted with all their data;
+* the shared demo account is kept, and its data is cleared only once nobody has touched it for
+  DEMO_RETENTION_HOURS, so a reviewer partway through the flow doesn't lose it;
+* anonymous funnel events past the window are deleted;
+* appointment slots are topped up so the next two weeks always have open times.
+The audit log (ids and action names only) is kept.
 """
 
 import os
 from datetime import UTC, datetime, timedelta
 
-from sqlalchemy import select
+from sqlalchemy import delete, func, select
 
 from app.config import get_settings
 from app.db import get_db
-from app.models import User
+from app.models import Booking, Consent, FunnelEvent, IntakeRecord, User
 from app.security import email_lookup_key
 from app.services.privacy import delete_account, purge_user_data
+from app.services.scheduling import seed_slots
 
-if __name__ == "__main__":
+
+def last_activity(db, user_id: str) -> datetime | None:
+    times = [
+        db.scalar(select(func.max(IntakeRecord.updated_at)).where(IntakeRecord.user_id == user_id)),
+        db.scalar(select(func.max(Booking.created_at)).where(Booking.user_id == user_id)),
+        db.scalar(select(func.max(Booking.cancelled_at)).where(Booking.user_id == user_id)),
+        db.scalar(select(func.max(Consent.granted_at)).where(Consent.user_id == user_id, Consent.revoked_at.is_(None))),
+    ]
+    times = [t for t in times if t is not None]
+    return max(times) if times else None
+
+
+def main() -> None:
     settings = get_settings()
     cutoff = datetime.now(UTC) - timedelta(hours=settings.demo_retention_hours)
     demo_email = os.environ.get("DEMO_USER_EMAIL")
     keep = email_lookup_key(demo_email) if demo_email else None
     db = next(get_db())
-    purged = 0
-    for user in db.scalars(select(User).where(User.created_at < cutoff, User.role == "user")):
+    deleted = cleared = 0
+    for user in db.scalars(select(User).where(User.role == "user")).all():
         if user.email_lookup == keep:
-            purge_user_data(db, user.id, None, "scheduled_demo_purge")
-        else:
+            latest = last_activity(db, user.id)
+            if latest is not None and latest < cutoff:
+                purge_user_data(db, user.id, None, "scheduled_demo_purge")
+                cleared += 1
+        elif user.created_at < cutoff:
             delete_account(db, user.id)
-        purged += 1
+            deleted += 1
+    events = db.execute(delete(FunnelEvent).where(FunnelEvent.at < cutoff)).rowcount
     db.commit()
-    print(f"purged {purged} accounts older than {settings.demo_retention_hours}h")
+    added = seed_slots(db, days=14)
+    print(f"deleted {deleted} accounts, cleared the demo account {cleared}x, removed {events} events, added {added} slots")
+
+
+if __name__ == "__main__":
+    main()

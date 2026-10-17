@@ -8,7 +8,11 @@ import { StepPage } from "../components/StepPage";
 import { t, type MessageKey } from "../i18n";
 
 type Action = "withdraw" | "data" | "account";
-const BODY: Record<Action, MessageKey> = { withdraw: "privacy.confirmWithdraw", data: "privacy.confirmData", account: "privacy.confirmAccount" };
+const BODY: Record<Action, MessageKey> = {
+  withdraw: "privacy.confirmWithdraw",
+  data: "privacy.confirmData",
+  account: "privacy.confirmAccount",
+};
 
 export function Privacy() {
   const navigate = useNavigate();
@@ -32,7 +36,7 @@ export function Privacy() {
     onSuccess: () => forget("/deleted"),
   });
   const photo = useMutation({
-    mutationFn: (on: boolean) => api.grantConsent(on),
+    mutationFn: (on: boolean) => api.setPhotoConsent(on),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["consent"] }),
   });
   const signOut = async () => {

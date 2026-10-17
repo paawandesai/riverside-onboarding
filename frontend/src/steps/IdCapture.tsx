@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Camera, Hand, Sun, Square } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
-import { Link, useNavigate } from "react-router";
+import { Link, Navigate, useNavigate } from "react-router";
 import { api, ApiError, type ExtractResult } from "../api";
 import { useDraft } from "../app/draft";
 import { useSupport, useSupportActions } from "../app/support";
@@ -25,7 +25,7 @@ export default function IdCapture() {
   useEffect(() => () => (picked ? URL.revokeObjectURL(picked.url) : undefined), [picked]);
 
   const enableScan = useMutation({
-    mutationFn: () => api.grantConsent(true),
+    mutationFn: () => api.setPhotoConsent(true),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["consent"] }),
   });
 
@@ -58,11 +58,11 @@ export default function IdCapture() {
   };
 
   useSupportActions((action) => {
-    if (action === "Try again") {
+    if (action === "try_again") {
       choose();
       return true;
     }
-    if (action === "Type it instead") {
+    if (action === "type_instead") {
       typeInstead(true);
       return true;
     }
@@ -76,6 +76,8 @@ export default function IdCapture() {
   }, [support]);
 
   if (consent.isPending) return <p aria-live="polite">{t("common.loading")}</p>;
+  // Turning on scanning only changes an existing consent; without one, the notice comes first.
+  if (consent.data && !consent.data.active) return <Navigate to="/consent" replace />;
   const scanAllowed = consent.data?.photo_scan === true;
 
   return (
@@ -95,24 +97,23 @@ export default function IdCapture() {
       )}
       {scanAllowed && (
         <input
-        ref={input}
-        id="id-photo"
-        type="file"
-        className="visually-hidden"
-        tabIndex={-1}
-        aria-hidden="true"
-        accept={[...ACCEPTED_TYPES, ".heic", ".heif"].join(",")}
-        capture="environment"
-        onChange={(e) => {
-          support.setPaused(false);
-          const file = e.target.files?.[0];
-          e.target.value = "";
-          if (!file) return;
-          const error = checkPhoto(file);
-          if (error) return setProblem(error);
-          setPicked({ file, url: URL.createObjectURL(file) });
-        }}
-      />
+          ref={input}
+          id="id-photo"
+          type="file"
+          className="visually-hidden"
+          tabIndex={-1}
+          aria-hidden="true"
+          accept={[...ACCEPTED_TYPES, ".heic", ".heif"].join(",")}
+          onChange={(e) => {
+            support.setPaused(false);
+            const file = e.target.files?.[0];
+            e.target.value = "";
+            if (!file) return;
+            const error = checkPhoto(file);
+            if (error) return setProblem(error);
+            setPicked({ file, url: URL.createObjectURL(file) });
+          }}
+        />
       )}
       {scanAllowed && !picked && (
         <>

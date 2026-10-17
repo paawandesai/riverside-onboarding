@@ -72,7 +72,9 @@ def schedule(staff: User = Depends(require_staff), db: Session = Depends(get_db)
         .order_by(Slot.starts_at)
         .limit(200)
     ).all()
-    audit(db, "staff_listed_schedule", staff.id, None)
+    # One row per patient shown, so "who has seen patient X's details" can always be answered.
+    for booking, _, _ in rows:
+        audit(db, "staff_listed_schedule", staff.id, booking.user_id)
     db.commit()
     return [_schedule_item(b, s, r) for b, s, r in rows]
 

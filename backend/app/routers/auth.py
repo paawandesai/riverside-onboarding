@@ -1,6 +1,6 @@
 import hmac
 
-from fastapi import APIRouter, Depends, HTTPException, Response
+from fastapi import APIRouter, Depends, HTTPException, Request, Response
 from pydantic import BaseModel, EmailStr, Field
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
@@ -9,14 +9,18 @@ from sqlalchemy.orm import Session
 from app.config import get_settings
 from app.db import get_db
 from app.models import User
+from app.ratelimit import check, client_ip, per_ip
 from app.security import (
     SESSION_COOKIE,
     SESSION_MAX_AGE_SECONDS,
     current_user,
     email_lookup_key,
     encrypt_str,
+    end_sessions,
     hash_password,
     make_session_token,
+    needs_rehash,
+    read_session_token,
     verify_password,
 )
 
@@ -40,10 +44,10 @@ class MeOut(BaseModel):
     role: str
 
 
-def _set_session(response: Response, user_id: str) -> None:
+def _set_session(response: Response, user: User) -> None:
     response.set_cookie(
         SESSION_COOKIE,
-        make_session_token(user_id),
+        make_session_token(user),
         max_age=SESSION_MAX_AGE_SECONDS,
         httponly=True,
         secure=get_settings().secure_cookies,
@@ -53,10 +57,16 @@ def _set_session(response: Response, user_id: str) -> None:
 
 
 def _invite_ok(code: str) -> bool:
-    return any(hmac.compare_digest(code, valid) for valid in get_settings().invite_code_set)
+    # Bytes, so any Unicode input compares safely; every code is checked so timing doesn't reveal which matched.
+    given = code.encode()
+    matches = [hmac.compare_digest(given, valid.encode()) for valid in get_settings().invite_code_set]
+    return any(matches)
 
 
-@router.post("/signup", response_model=MeOut, status_code=201)
+_DUPLICATE = "We couldn't create an account with those details. If you already have one, sign in instead."
+
+
+@router.post("/signup", response_model=MeOut, status_code=201, dependencies=[Depends(per_ip("signup", 10, 3600))])
 def signup(body: SignupIn, response: Response, db: Session = Depends(get_db)) -> MeOut:
     if not _invite_ok(body.invite_code):
         raise HTTPException(status_code=403, detail="That invite code isn't valid. This demo is invite-only.")
@@ -75,22 +85,35 @@ def signup(body: SignupIn, response: Response, db: Session = Depends(get_db)) ->
         db.commit()
     except IntegrityError:
         db.rollback()
-        raise HTTPException(status_code=409, detail="An account with that email already exists. Try signing in.") from None
-    _set_session(response, user.id)
+        raise HTTPException(status_code=409, detail=_DUPLICATE) from None
+    _set_session(response, user)
     return MeOut(id=user.id, role=user.role)
 
 
-@router.post("/login", response_model=MeOut)
-def login(body: LoginIn, response: Response, db: Session = Depends(get_db)) -> MeOut:
+@router.post("/login", response_model=MeOut, dependencies=[Depends(per_ip("login", 20, 60))])
+def login(body: LoginIn, request: Request, response: Response, db: Session = Depends(get_db)) -> MeOut:
+    # Per address and per account, so guessing one password and spraying many accounts are both slowed.
+    check("login-account", f"{client_ip(request)}:{email_lookup_key(body.email)}", 5, 60)
     user = db.scalar(select(User).where(User.email_lookup == email_lookup_key(body.email)))
-    if user is None or not verify_password(user.password_hash, body.password):
+    # Unknown emails still pay for a hash, so response time doesn't reveal which accounts exist.
+    if not verify_password(user.password_hash if user else None, body.password) or user is None:
         raise HTTPException(status_code=401, detail="Email or password is incorrect.")
-    _set_session(response, user.id)
+    if needs_rehash(user.password_hash):
+        user.password_hash = hash_password(body.password)
+        db.commit()
+    _set_session(response, user)
     return MeOut(id=user.id, role=user.role)
 
 
 @router.post("/logout", status_code=204)
-def logout(response: Response) -> None:
+def logout(request: Request, response: Response, db: Session = Depends(get_db)) -> None:
+    """Sign out everywhere: tokens issued before now stop working, not just this browser's cookie."""
+    token = request.cookies.get(SESSION_COOKIE)
+    session = read_session_token(token) if token else None
+    user = db.get(User, session[0]) if session else None
+    if user is not None and user.session_version == session[1]:
+        end_sessions(user)
+        db.commit()
     response.delete_cookie(SESSION_COOKIE, path="/")
 
 

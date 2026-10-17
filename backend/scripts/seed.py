@@ -6,11 +6,11 @@ Usage: python -m scripts.seed [--demo-user]   (reads DEMO_USER_EMAIL / DEMO_USER
 import argparse
 import os
 
-from sqlalchemy import func, select
+from sqlalchemy import select
 
 from app.db import get_db
-from app.models import Slot, User
-from app.security import email_lookup_key, encrypt_str, hash_password, verify_password
+from app.models import User
+from app.security import email_lookup_key, encrypt_str, end_sessions, hash_password, verify_password
 from app.services.scheduling import seed_slots
 
 
@@ -19,10 +19,8 @@ def main() -> None:
     parser.add_argument("--demo-user", action="store_true")
     args = parser.parse_args()
     db = next(get_db())
-    if db.scalar(select(func.count()).select_from(Slot)) == 0:
-        print(f"created {seed_slots(db)} slots")
-    else:
-        print("slots already seeded")
+    # Tops up a rolling two weeks; existing slots (and their bookings) are left alone.
+    print(f"added {seed_slots(db)} slots")
     if args.demo_user:
         email, password = os.environ.get("DEMO_USER_EMAIL"), os.environ.get("DEMO_USER_PASSWORD")
         if not email or not password:
@@ -32,6 +30,7 @@ def main() -> None:
             # Rotating DEMO_USER_PASSWORD and redeploying rotates the demo credentials.
             if not verify_password(existing.password_hash, password):
                 existing.password_hash = hash_password(password)
+                end_sessions(existing)  # anyone signed in with the old password is signed out
                 db.commit()
                 print("rotated demo user password")
         else:

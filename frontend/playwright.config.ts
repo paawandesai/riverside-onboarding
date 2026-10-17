@@ -39,6 +39,9 @@ export default defineConfig({
       // Throwaway per-run keys; none are stored anywhere.
       SESSION_SECRET: randomBytes(48).toString("base64url"),
       FIELD_ENCRYPTION_KEY: randomBytes(32).toString("base64").replace(/\+/g, "-").replace(/\//g, "_"),
+      EMAIL_HMAC_KEY: randomBytes(48).toString("base64url"),
+      // Every test signs up from localhost; the limiter is covered by backend tests.
+      RATE_LIMITS_ENABLED: "false",
       INVITE_CODES: "e2e-invite",
       STAFF_EMAIL: process.env.E2E_STAFF_EMAIL,
       STAFF_PASSWORD: process.env.E2E_STAFF_PASSWORD,

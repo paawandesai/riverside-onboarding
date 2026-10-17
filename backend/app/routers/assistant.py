@@ -9,6 +9,7 @@ from sqlalchemy.orm import Session
 from app.db import get_db
 from app.logging_config import log_event
 from app.models import FunnelEvent, User
+from app.ratelimit import check, per_ip
 from app.routers.intake import require_consent
 from app.services import chat, support
 
@@ -19,17 +20,25 @@ router = APIRouter(prefix="/api", tags=["assistant"])
 class ChatTurn(BaseModel):
     role: str = Field(pattern="^(user|assistant)$")
     content: str = Field(max_length=4000)
+    # Assistant turns carry the signature the server returned with them; unsigned ones are dropped.
+    sig: str | None = Field(default=None, max_length=128)
 
 
 class ChatIn(BaseModel):
     messages: list[ChatTurn] = Field(min_length=1, max_length=60)
 
 
+class SupportActionOut(BaseModel):
+    # The id is what the app acts on; the label is only shown, so copy can change or be translated.
+    id: Literal["talk_to_person", "continue", "try_again", "use_form", "type_instead", "check_details", "see_other_times", "save_and_leave"]
+    label: str
+
+
 class SupportCardOut(BaseModel):
     trigger: str
     title: str
     body: str
-    actions: list[str]
+    actions: list[SupportActionOut]
     urgent: bool
 
 
@@ -53,17 +62,20 @@ class ChatOut(BaseModel):
     ui_action: str | None
     notice: str | None
     disclosure: str
+    reply_sig: str
 
 
 @router.post("/chat", response_model=ChatOut)
 def chat_turn(body: ChatIn, user: User = Depends(require_consent)) -> ChatOut:
     """Transcripts are not stored: the client holds the conversation and sends it each turn."""
+    # Each turn may spend model credit, so one account gets a steady conversational pace, not a flood.
+    check("chat", user.id, 20, 60)
     try:
-        result = chat.run_turn([t.model_dump() for t in body.messages])
+        result = chat.run_turn(chat.trusted_history([t.model_dump() for t in body.messages], user.id))
     except chat.ChatInputError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from None
     log_event(logger, "chat_turn", component="chat", mode=result.mode, intent=result.intent, user_id=user.id)
-    return ChatOut(**vars(result))
+    return ChatOut(**vars(result), reply_sig=chat.sign_reply(user.id, result.reply))
 
 
 class SignalsIn(BaseModel):
@@ -75,7 +87,7 @@ class SignalsIn(BaseModel):
     llm_unavailable: bool = False
 
 
-@router.post("/support/evaluate", response_model=SupportOut)
+@router.post("/support/evaluate", response_model=SupportOut, dependencies=[Depends(per_ip("support", 60, 60))])
 def evaluate_support(body: SignalsIn) -> dict:
     """Returns {"content": card} for the highest-priority active trigger, or {"content": null}."""
     content = support.content_for(support.Signals(**body.model_dump()))
@@ -90,7 +102,7 @@ class EventIn(BaseModel):
     event: str = Field(pattern="^[a-z_]{2,32}$")
 
 
-@router.post("/events", status_code=204)
+@router.post("/events", status_code=204, dependencies=[Depends(per_ip("events", 120, 60))])
 def record_event(body: EventIn, db: Session = Depends(get_db)) -> None:
     """First-party funnel analytics: anonymous session id, step and event name only."""
     db.add(FunnelEvent(anon_session_id=str(body.anon_session_id), step_id=body.step_id, event=body.event))
