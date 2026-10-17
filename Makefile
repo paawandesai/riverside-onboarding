@@ -1,4 +1,4 @@
-.PHONY: setup db seed api web test lint eval load licenses
+.PHONY: setup db seed api web test e2e lint eval load licenses
 
 setup:            ## install backend + frontend deps and git hooks
 	cd backend && python3 -m venv .venv && .venv/bin/pip install -r requirements-dev.txt
@@ -17,9 +17,12 @@ api:
 web:
 	cd frontend && npm run dev
 
-test:             ## backend (pytest, >=80% coverage) + frontend (jest, >=80% lines)
+test:             ## backend (pytest, >=80% coverage) + frontend (vitest, >=80% lines)
 	cd backend && .venv/bin/pytest
 	cd frontend && npm test
+
+e2e:              ## Playwright against the real API + built frontend; needs E2E_DATABASE_URL (an empty database)
+	cd frontend && npm run build && npm run e2e
 
 lint:
 	cd backend && .venv/bin/ruff check . && .venv/bin/ruff format --check .

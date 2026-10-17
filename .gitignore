@@ -33,3 +33,7 @@ tmp/
 eval/results/*.json
 !eval/results/.gitkeep
 .DS_Store
+
+# Playwright
+frontend/playwright-report/
+frontend/test-results/

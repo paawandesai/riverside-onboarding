@@ -1,4 +1,4 @@
-# CI: secret scan, lint, tests with coverage gates, license audit, OCR eval, container build.
+# CI: secret scan, lint, tests with coverage gates, end-to-end tests, license audit, OCR eval, container build.
 # No secrets are needed: tests use random per-run keys and never call the Claude API.
 
 stages: [scan, test, build]
@@ -48,6 +48,9 @@ backend:
     - alembic upgrade head
     - alembic check
     - pytest --cov-report=term --cov-report=xml:coverage.xml --junitxml=report.xml
+    # The frontend's API types are generated from this schema; fail if the committed copy is stale.
+    - python -m scripts.export_openapi /tmp/openapi.json
+    - cmp /tmp/openapi.json ../frontend/src/api/openapi.json || (echo "Run: python -m scripts.export_openapi, then npm run gen:api" && exit 1)
   coverage: '/TOTAL.*\s(\d+(?:\.\d+)?)%/'
   artifacts:
     when: always
@@ -66,8 +69,41 @@ frontend:
   script:
     - npm run lint
     - npm run typecheck
-    - npm test -- --ci
+    # Generated types must match the committed OpenAPI schema.
+    - cp src/api/schema.d.ts /tmp/schema.d.ts && npm run gen:api && cmp src/api/schema.d.ts /tmp/schema.d.ts
+    - npm test
     - npm run build
+
+e2e:
+  stage: test
+  # Browsers and Node come with the image (version matches @playwright/test); Python and Tesseract
+  # are added for the real API, which serves the built frontend.
+  image: mcr.microsoft.com/playwright:v1.64.1-noble
+  services:
+    - name: postgres:16-alpine
+      alias: db
+  variables:
+    POSTGRES_DB: onboarding_e2e
+    POSTGRES_USER: onboarding
+    POSTGRES_HOST_AUTH_METHOD: trust
+    E2E_DATABASE_URL: postgresql+pg8000://onboarding@db:5432/onboarding_e2e
+    OMP_THREAD_LIMIT: "1"
+  cache:
+    - key: { files: [frontend/package-lock.json] }
+      paths: [.cache/npm]
+    - key: { files: [backend/requirements.lock] }
+      paths: [.cache/pip]
+  before_script:
+    - apt-get update && apt-get install -y --no-install-recommends python3-venv tesseract-ocr tesseract-ocr-eng && rm -rf /var/lib/apt/lists/*
+    - python3 -m venv backend/.venv && backend/.venv/bin/pip install -r backend/requirements.txt
+    - cd frontend && npm ci --no-audit --no-fund && npm run build
+  script:
+    # Real API, real database, real OCR; only the chat call is broken on purpose in one test.
+    - npx playwright test
+  artifacts:
+    when: on_failure
+    paths: [frontend/playwright-report, frontend/test-results]
+    expire_in: 7 days
 
 licenses:
   stage: test
