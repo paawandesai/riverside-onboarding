@@ -50,7 +50,7 @@ backend:
     - pytest --cov-report=term --cov-report=xml:coverage.xml --junitxml=report.xml
     # The frontend's API types are generated from this schema; fail if the committed copy is stale.
     - python -m scripts.export_openapi /tmp/openapi.json
-    - cmp /tmp/openapi.json ../frontend/src/api/openapi.json || (echo "Run: python -m scripts.export_openapi, then npm run gen:api" && exit 1)
+    - 'cmp /tmp/openapi.json ../frontend/src/api/openapi.json || (echo "Stale schema. Run python -m scripts.export_openapi, then npm run gen:api" && exit 1)'
   coverage: '/TOTAL.*\s(\d+(?:\.\d+)?)%/'
   artifacts:
     when: always
