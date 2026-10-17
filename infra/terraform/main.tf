@@ -91,7 +91,7 @@ resource "time_sleep" "rbac_propagation" {
 
 resource "azurerm_postgresql_flexible_server" "db" {
   name                = "psql-${var.name}-${local.suffix}"
-  location            = local.location
+  location            = var.db_location
   resource_group_name = local.rg
   version             = "16"
   sku_name            = "B_Standard_B1ms" # burstable; covered by the Azure free account's monthly hours

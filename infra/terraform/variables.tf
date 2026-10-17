@@ -13,6 +13,12 @@ variable "location" {
   default     = null
 }
 
+variable "db_location" {
+  description = "Region for Postgres. Free and trial subscriptions are often blocked from Flexible Server in busy regions (eastus returned no offers), so it can differ from the app's region."
+  type        = string
+  default     = "centralus"
+}
+
 variable "name" {
   description = "Short name used as a prefix for resources."
   type        = string

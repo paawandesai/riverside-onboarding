@@ -42,6 +42,9 @@ The image tag is the current commit, so the working tree must be clean. Without
 
 ## Known limits
 
+- Postgres runs in `centralus` (`db_location`) while the app runs in the resource group's region:
+  this subscription had no Flexible Server offers in `eastus`. Each query crosses regions (tens of ms).
+
 - No VNet: Postgres allows connections from Azure services (firewall rule `0.0.0.0`), protected
   by TLS and a generated password. A production setup would use VNet integration and a
   private endpoint, which the free account's consumption plan doesn't include.
