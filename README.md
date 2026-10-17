@@ -10,6 +10,10 @@ they want a visit, optionally photographs an ID card so their details fill thems
 corrects every field, and books an appointment. Supportive content appears when the flow detects distress, repeated
 upload failures, low OCR confidence, a booking conflict or a long pause.
 
+**Live demo:** https://ca-onboarding.nicerock-b1cfe27d.eastus.azurecontainerapps.io (Azure Container
+Apps; scales to zero, so the first request after idle takes a few seconds). Sign-up needs an invite
+code; ask the author for it or for the demo login.
+
 ## Quick start (local)
 
 Needs Docker, or Python 3.13 + Node 22 + Postgres 16 + Tesseract 5.
