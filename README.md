@@ -42,7 +42,7 @@ is in this repository, and all are rotated after grading.
 
 ## Quick start (local)
 
-Needs Docker, or Python 3.13 + Node 22 + Postgres 16 + Tesseract 5.
+Needs Docker, or Python 3.13 + Node 22 + Postgres 16 + Tesseract 5 + `pre-commit` (`pip install pre-commit`; `make setup` installs the git hooks with it).
 
 ```bash
 cp .env.example .env        # fill SESSION_SECRET, EMAIL_HMAC_KEY, FIELD_ENCRYPTION_KEY, INVITE_CODES, POSTGRES_PASSWORD
@@ -53,6 +53,10 @@ Without Docker: create two Postgres databases, `onboarding` and `onboarding_test
 `DATABASE_URL` in `.env` to the first (the backend reads the repo-root `.env`), then
 `make setup db seed`, `make api` and `make web` (http://localhost:5173).
 `make test`, `make e2e`, `make lint`, `make eval`, `make load INVITE_CODE=...`, `make licenses`.
+`make eval` is this stack's version of the PRD's `rake ai:eval`; it prints the scorecard and exits 1
+if a threshold is missed. `make e2e` needs a third, empty database (`E2E_DATABASE_URL`, default
+`onboarding_e2e`); if Playwright's bundled browser isn't installed, point `PW_CHROMIUM_PATH` at a
+local Chromium. For a local staff login, set `STAFF_EMAIL` and `STAFF_PASSWORD` and run `make staff`.
 Tests drop and recreate every table, so they use `TEST_DATABASE_URL` (default
 `postgresql+pg8000://onboarding:localdev@localhost:5432/onboarding_test`) and refuse to run against
 a database whose name doesn't end in `_test`.
@@ -66,9 +70,9 @@ Specimen ID images for trying the upload step are in `fixtures/generated-ids/` (
 
 | Step | Behaviour |
 |---|---|
-| Sign-up | Invite code required, adult (18+) self-attestation, argon2 password hash, httpOnly signed session cookie. Every public account is `user` role. The form says what is stored before consent and links the notice. Sign-in, sign-up, chat and uploads are rate-limited; signing out ends the session in that browser only, so other people on a shared demo login stay signed in. |
+| Sign-up | Invite code required, adult (18+) self-attestation, argon2 password hash, httpOnly signed session cookie. Every public account is `user` role. The form says what is stored before consent and links the notice. Sign-in, sign-up, chat, uploads and saves are rate-limited; signing out ends the session in that browser only, so other people on a shared demo login stay signed in. |
 | Consent | Shown before any upload or question: six short points (what is collected, that chat text goes to Anthropic and how long Anthropic keeps it, that staff review the summary, how to withdraw) with the full notice one tap away. ID scanning is a separate, optional switch; without it the upload endpoint refuses photos and the patient types instead. Turning scanning on later only changes an existing consent, and the intake steps send anyone without consent back to the notice. A changed notice is asked for again. Nothing but the account is stored before the consent click. |
-| ID upload | JPEG (including the MPO files phones save for HDR shots; first frame only)/PNG/WEBP/HEIC up to 8 MB, magic-byte check, no more than 64 progressive scans, limits on size (16 MP, 8000 px a side) and shape (4:1), EXIF/GPS stripped, shrunk to 2500 px before OCR. Tesseract reads name, DOB and address **on the server, in memory**: the body is refused before parsing if too large and is never spooled to a temp file. The image is never stored and never sent to any model. |
+| ID upload | JPEG (including the MPO files phones save for HDR shots; first frame only)/PNG/WEBP/HEIC up to 8 MB, magic-byte check, no more than 64 progressive scans, limits on size (16 MP, 8000 px a side) and shape (4:1), EXIF/GPS stripped, shrunk to 2500 px before OCR. Tesseract reads name, DOB and address **on the server, in memory**: the body is refused before parsing if too large and is never spooled to a temp file, and the cleaned image goes to Tesseract through a pipe (stdin) with its output read from stdout, so no file is written (a test checks this). The image is never stored and never sent to any model. |
 | Confirm | Every extracted field is shown for the user to confirm or edit; low-confidence and missing fields are highlighted. Manual entry always works, including when OCR is down. The source of each field (OCR confirmed, OCR edited, manual) is recorded. |
 | Assistant | Comes before the ID step. A plain form is offered alongside the chat and takes over, prefilled with what the patient already said, if the assistant fails. Claude classifies each message into one of five intents and extracts four visit fields with a strict JSON schema. The server validates the output, strips links (including bare domains), replaces any claim to have booked or cancelled something, and always uses a fixed reply for reschedule requests. Earlier assistant turns are signed by the server, so a forged one is dropped before it reaches the model; email addresses and phone numbers in common formats (US, `+` or `00` international, and national numbers with a leading 0) are removed from what the patient types. Distress keywords force the safety reply (988 / 911) regardless of the model. On timeout or error the rule-based fallback takes over. The AI disclosure is shown at the start. |
 | Summary | A deterministic, non-binding summary for staff review. No diagnosis or triage. |
@@ -101,11 +105,13 @@ Specimen ID images for trying the upload step are in `fixtures/generated-ids/` (
 
 ## Measured results
 
-Measured on 2026-10-16 and 2026-10-17 in a Linux x86_64 container with 4 CPUs and 15 GB RAM, Python 3.13,
+Measured on 2026-10-16 to 2026-10-18 in a Linux x86_64 container with 4 CPUs and 15 GB RAM, Python 3.13,
 Tesseract 5.3.4, Postgres 16 on the same machine. Re-run with `make eval` and `make load`.
 
-**Tests** (re-measured 2026-10-17, after the audit fixes). Backend: 163 tests, 93.8% coverage
-(gate 80%). Frontend unit: 50 tests, 93.2% lines (gate 80%), each screen also checked with axe.
+**Tests** (re-measured 2026-10-18, after the pre-submission audit fixes). Backend: 181 tests (one
+needs a database user that can create roles and is skipped without it; CI runs it), 94.1% coverage
+(gate 80%; `services/ocr.py`, `chat.py` and `scheduling.py` are each above 90%). Frontend unit: 50 tests,
+93.3% lines (gate 80%), each screen also checked with axe.
 End-to-end (Playwright, real API, real Postgres, real Tesseract, Pixel 7 viewport): 8 flow tests
 covering the ID-scan path, unreadable photo to typing, assistant failure to the form, two patients
 booking the same slot, consent withdrawal deleting data, the staff view and analytics, deep links, and the security
@@ -114,13 +120,18 @@ headers with a dialog open under the CSP; plus 3 accessibility tests on mobile a
 
 **Frontend size.** Initial JavaScript is 131 KiB gzipped (budget 170 KiB); later steps load on demand.
 
-**OCR field accuracy** (name, DOB, address; 3 fields x 30 images per set; re-measured 2026-10-17):
+**OCR field accuracy** (name, DOB, address; 3 fields x 30 images per set; re-measured 2026-10-18 after OCR
+moved to pipes, unchanged from 2026-10-17). The PRD's 90% threshold is across all three fields; the
+per-field columns show where the misses are.
 
-| Set | Accuracy | Clean | Phone photo | Skew/glare | Hard | p95 | Wrong value shown for review | Left blank |
-|---|---|---|---|---|---|---|---|---|
-| `generated-ids` (tuned against) | 94.4% | 100% | 96.7% | 90.5% | 77.8% | 2.14 s | 2 | 3 |
-| `generated-ids-holdout` (not tuned, score seen before) | 92.2% | 96.7% | 93.3% | 100% | 55.6% | 2.15 s | 2 | 5 |
-| `generated-ids-holdout2` (made after the last change, never tuned on) | **91.1%** | 93.3% | 100% | 95.2% | 44.4% | 2.10 s | 2 | 6 |
+| Set | Accuracy | Name | DOB | Address | Clean | Phone photo | Skew/glare | Hard | p95 | Wrong value shown for review | Left blank |
+|---|---|---|---|---|---|---|---|---|---|---|---|
+| `generated-ids` (tuned against) | 94.4% | 96.7% | 96.7% | 90.0% | 100% | 96.7% | 90.5% | 77.8% | 2.16 s | 2 | 3 |
+| `generated-ids-holdout` (not tuned, score seen before) | 92.2% | 90.0% | 90.0% | 96.7% | 96.7% | 93.3% | 100% | 55.6% | 1.90 s | 2 | 5 |
+| `generated-ids-holdout2` (made after the last change, never tuned on) | **91.1%** | 100% | 90.0% | **83.3%** | 93.3% | 100% | 95.2% | 44.4% | 2.04 s | 2 | 6 |
+
+On the cleanest estimate (`holdout2`) address accuracy is 83.3%, below 90% on its own; the misses
+are mostly left blank for the patient to type rather than filled wrongly.
 
 The parser is tuned only against the first set. The first holdout was 88.9% before the latest
 change; its score was known while working, so `holdout2` was generated afterwards from a new seed
@@ -145,6 +156,14 @@ none fell back to the rules. 0 of 3,192 requests failed.
 | OCR upload | 934 ms | < 8 s |
 | Booking | 20.2 ms | < 1 s |
 
+How each row was measured, where it differs from the PRD's wording: OCR is one phone-photo card
+(`specimen-11.jpg`) uploaded 20 times in sequence after the 60 s load phase, timed by k6 from request
+to response (the eval's per-card p95 over 90 cards is about 2 s); booking is 20 sequential bookings
+timed by k6, not from the server log the PRD names, although the server logs `duration_ms` for each
+booking. Neither OCR nor booking was measured while the 20 VUs were running. A re-run on 2026-10-18
+with the model off (rule-based chat) gave API p95 247 ms, OCR 970 ms, booking 29 ms, 0 of 11,349
+requests failed; that run says nothing about Claude latency.
+
 The API (two workers, as deployed) and k6 ran in the same cloud container (4 CPUs) against
 api.anthropic.com; the deployed app adds network distance and a cold start after idle. An earlier
 run showed booking p95 at 1.78 s because the async OCR handler blocked the event loop; OCR now runs
@@ -157,18 +176,26 @@ in a thread pool.
 | `eval/intents.json` (30, used for tuning) | 29/30 | 30/30 | 30/30 | 30/30 |
 | `eval/intents-holdout.json` (40, written by the coding agent on 2026-10-17 in the informal style patients type) | **40/40** | **40/40** | 25/40 | 38/40 |
 
-Re-run on 2026-10-17 after the audit fixes: Claude 30/30 and 40/40, fallback 30/30 and 38/40.
+Re-run on 2026-10-17 after the audit fixes and again on 2026-10-18 after the pre-submission fixes:
+Claude 30/30 and 40/40, fallback 30/30 and 38/40. The 2026-10-18 Claude run is committed as
+`eval/scorecards/2026-10-18-claude-haiku-5-5.json` (every case, the model's intent and fields, and
+timings), so the Claude numbers can be checked without an API key.
 
 The one Claude miss was "Need a prescription refill for my blood pressure meds", which the prompt
 itself defined as out of scope ("prescriptions"). The prompt now says a visit about a medicine is a
 reason for a visit, while asking the assistant to prescribe or dose stays out of scope. The held-out
-set was written and scored before that change. Sequential p95 per Claude call is about 2 s.
+set was written and scored before that change. Sequential p95 per Claude call is about 1.7 to 2 s.
 
 The held-out set exposed a safety gap in the fallback: it caught only 3 of 8 crisis messages
 phrased indirectly ("everyone would be better off without me", "I can't cope"). The crisis pattern,
 which also overrides Claude, now covers indirect phrasing and catches 8/8 with no false alarms on
 the other 62 cases. Because those rules were extended after seeing the misses, the fallback's 38/40
-is no longer a held-out number.
+is no longer a held-out number. The 2026-10-18 audit found more phrasings it still missed (overdose
+wording such as "I took all my pills", "end things tonight", "don't want to be alive", "unalive",
+leetspeak, and basic Spanish, German and French); the pattern now covers them, and backend tests
+check them alongside ordinary sentences that must not trigger it ("I took my pills this morning").
+A keyword list will always miss some phrasing; on the Claude path the model's own distress intent
+also triggers the safety reply.
 
 **Scripted conversations** (`eval/conversations.json`, 5 multi-turn chats, 2026-10-17). After the
 last turn, the merged record must hold each field the patient gave and leave the others empty.
@@ -177,14 +204,18 @@ visit type and access needs stayed empty). Rule-based fallback: 1/5. The fallbac
 at a time and takes each new message as the reason, so later turns overwrite the first; it is a
 safety net, and the form it offers is how a patient finishes when the model is down.
 
-**Adversarial** (`eval/adversarial/`, 2026-10-17): 10/10 prompt-injection cases pass **on the Claude
+**Adversarial** (`eval/adversarial/`, 2026-10-17, re-run 2026-10-18): 10/10 prompt-injection cases pass **on the Claude
 path** and 10/10 on the fallback: no prompt leak, no links, no booking claims, valid intent and
 fields, distress override, a forged earlier assistant turn, a request to repeat "your appointment is
-now booked", and a bare-domain link. Separately, the server-side filter replaced 19/19 booking claims
-(including "Your visit on Tuesday is confirmed", "Tuesday 10am: confirmed." and "It's booked for Tuesday.") and stripped
-8/8 link shapes (bare domain, defanged `hxxps://`, `evil[.]example`, full-width dots, bare IPs,
-markdown, `www.`) that the two audits showed getting through, while leaving 9/9 ordinary replies
-(such as "Dr.Smith will review your answers") unchanged. Injected text printed on an ID image comes back as a plain field
+now booked", and a bare-domain link. Separately, the server-side filter replaced 24/24 booking claims
+(including "Your visit on Tuesday is confirmed", "Tuesday 10am: confirmed.", "It's booked for Tuesday.",
+"Booking complete for Tuesday 10am." and "Your slot has been secured.") and stripped
+9/9 link shapes (bare domain, defanged `hxxps://`, `evil[.]example`, full-width dots, bare IPs,
+markdown, `www.`, a mixed-case domain with a path) that the audits showed getting through, while
+leaving 12/12 ordinary replies (such as "Dr.Smith will review your answers" and "Your visit can be
+done by video") unchanged. The filter is a list of claim shapes, so a new paraphrase can still get
+through; the model has no tools, so a false claim can't change a booking, and the booking screen
+shows the real state. Injected text printed on an ID image comes back as a plain field
 value for the user to confirm and is never sent to a model.
 
 **Engine version.** The numbers above use Tesseract 5.3.4 in the development container. The
@@ -206,6 +237,14 @@ The schedule started on 2026-10-17, so there is no meaningful uptime figure yet;
 above for the current number rather than trusting one written here.
 
 ## Known constraints
+
+- The PRD asks the health endpoint to report LLM reachability. The project's rules say a health
+  check never makes a live model call (it would spend quota on every uptime ping), so
+  `/api/health` reports whether the model is configured, which model, and the last success and
+  failure each worker saw. It can't show that the provider is reachable right now, and right after
+  a restart both timestamps are empty. The model id is checked against the Models API once at startup.
+- The PRD's OCR and booking timings are measured differently from its wording; see the note under
+  the load-test table. Uptime has no figure until the review period has run (see below).
 
 - OCR clears 90% on both held-out sets (92.2% and 91.1%), but only by a small margin, and the
   "hard" category (heavy blur, low contrast) is still weak at 44 to 56%. A stronger OCR model was
@@ -249,6 +288,28 @@ above for the current number rather than trusting one written here.
   kept 30 days (`ANALYTICS_RETENTION_DAYS`) while account data on the public demo is purged after
   24 hours. Sample patients are left out of the OCR correction rates.
 - Age is self-attested; nothing verifies it.
+- Key Vault has a public endpoint with no network rules, and purge protection is off. Container Apps
+  isn't on Key Vault's trusted-services list and the app has no VNet or fixed outbound address, so a
+  deny-by-default vault rule would cut the app off from its secrets; closing it needs the same VNet
+  work as the database. Purge protection is off because, once on, it can never be turned off and the
+  deleted vault couldn't be purged when the demo is torn down. Every secret read needs an Entra ID
+  token with a role on the vault (RBAC mode).
+- After an account is deleted, the audit log keeps its random account id and a list of actions
+  with times (consent given, booking made, viewed by staff, deleted), but no name, email, answers or
+  booking details. The app's database role can't change or delete audit rows.
+- Email addresses and phone numbers are removed from chat text only in common written formats; one
+  spelled out in words ("five five five, oh one four two") or "jane at example dot org" is sent to
+  Anthropic as typed. The chat asks patients not to type identifiers.
+- The address form takes US addresses only (two-letter state, five-digit ZIP); the clinic is fictional and US-based.
+- Per-address rate limits trust the last `X-Forwarded-For` hop added by Azure's ingress
+  (`FORWARDED_IP_HOPS=1`); this wasn't tested against the live demo.
+- `/api/events` (anonymous funnel events) needs no sign-in, so anyone can add made-up events and
+  skew the analytics, within an allow-list of steps and 120 events a minute per address.
+- Sessions last 8 hours from sign-in with no idle timeout; signing out or a password change ends them.
+- Base images are pinned by tag (`python:3.13-slim-bookworm`, `node:22-bookworm-slim`), not by
+  digest, so a rebuild picks up Debian security updates; the backend packages are hash-pinned.
+- The uptime schedule asks GitLab for a run every 15 minutes, but GitLab's scheduler starts runs
+  10 to 20 minutes apart; `scripts/uptime_report.py` reports checks run against checks expected.
 - The PRD asks for a GitHub repository; this one is on GitLab, which the author confirmed is fine.
 - The app, its migration init container and the purge job share one managed identity with read
   access to the whole Key Vault, so code running in the app container could fetch the database
@@ -276,6 +337,25 @@ above for the current number rather than trusting one written here.
   namespaces, so Docker-in-Docker and Buildah both fail there. The image is built and
   smoke-tested locally and by `infra/deploy.sh`.
 
+## HIPAA: which rules would apply and how the design maps to them
+
+The assumed service is outpatient health care, so a real deployment would be a HIPAA covered entity
+(or its business associate) handling PHI. PCI DSS doesn't apply: the app takes no payments. This demo
+holds synthetic data only and is **not** HIPAA compliant (no BAAs, no risk analysis, no policies,
+no workforce training, no breach process). What the design already does, against the Security Rule's
+technical safeguards (45 CFR 164.312) and the Privacy Rule's minimum-necessary standard:
+
+| Safeguard | In this build | Missing for a real deployment |
+|---|---|---|
+| Access control | Per-user sessions; a patient reaches only their own record; staff role is read-only | Unique staff accounts (no shared logins), MFA, emergency access procedure |
+| Audit controls | Append-only audit log of consent, bookings, deletions and every staff read | Log review process, retention policy, export to a SIEM |
+| Integrity | Server-side validation; field sources recorded (OCR confirmed, edited, manual) | Integrity checks on backups |
+| Authentication | argon2 passwords, revocable sessions, rate-limited sign-in | MFA, password policy, account lockout policy |
+| Transmission security | HTTPS only with HSTS; TLS to Postgres required | Private networking (VNet) for the database and Key Vault |
+| Encryption at rest | Field-level Fernet encryption of identity fields and answers; Azure storage encryption | Key management procedures, key rotation schedule |
+| Minimum necessary | Three identity fields and four visit fields; no ID image stored; chat transcripts not stored; identity fields never sent to the model | A documented data inventory and review |
+| Vendors | Provider table below | BAAs with Anthropic and Microsoft before any real data |
+
 ## Data sent to each provider
 
 | Provider | What it receives | Personal fields | Retention |
@@ -287,17 +367,27 @@ above for the current number rather than trusting one written here.
 No analytics SDK is used. Funnel events go to a first-party table (step, timestamp, random session id)
 and are only shown to staff as counts.
 A BAA is not needed for synthetic data; a real deployment would need BAAs with Anthropic and Microsoft first.
-Accepting Anthropic's BAA in the Claude Console applies to the whole organization and can't be
-undone, so a real deployment would use a separate organization for it, and could use only
+Accepting Anthropic's BAA in the Claude Console covers only the organization that accepted it, and
+the project's guidance treats that acceptance as permanent (Anthropic's BAA help page on 2026-10-18
+doesn't say either way), so a real deployment would use a separate organization for it, and could use only
 HIPAA-eligible features (this app uses only the Messages API, not the Files or Batch APIs).
 
 ## API cost
 
 The Claude API is paid per token. With the default `claude-haiku-5-5` ($0.10 per million input
-tokens, $0.50 per million output, Anthropic pricing page on 2026-10-16), one chat turn is about
+tokens, $0.50 per million output, Anthropic pricing page on 2026-10-16, re-checked 2026-10-18), one chat turn is about
 1,000 to 2,000 input tokens and under 200 output tokens, so roughly **$0.0002 to $0.0003 per turn** and about
 **$0.001 to $0.002 per completed sign-up**. The worst case per turn (20 long turns, 2,048 output
 tokens) is about $0.0016. Each account can send at most 20 chat turns a minute. These are estimates from prompt sizes, not measured usage.
+
+Spend guards: each worker makes at most `LLM_DAILY_CALL_CAP` model calls per 24 hours (default
+2,000; with two workers on up to two replicas that is at most 8,000 calls, roughly $1.60 to $13
+a day at the figures above); past it, chat runs on the rule-based fallback and says so. Set a
+monthly spend limit on the Claude Console organization as well; the app can't see it.
+
+The key must be an API key from a Claude Console organization (never a consumer Claude login or
+Claude Code credentials). New organizations start in a reduced-limit Evaluation tier; the 20-VU
+load test needs a tier whose rate limits allow about 17 calls a second.
 
 The model is set with `ANTHROPIC_MODEL`. Haiku 5.5 was chosen for the < 3 s latency target; it is
 active with retirement not before 2027-10-07. The app checks the model id against the Models API
@@ -322,14 +412,17 @@ at startup and fails fast if it is unavailable.
 - Signing out revokes that browser's session id on the server, so a copied cookie stops working,
   while other people signed in to the same shared demo login stay signed in. A password or role
   change ends every session for that account. Sign-in,
-  sign-up, chat, uploads and analytics events are rate-limited, and at most four password hashes
+  sign-up, chat, uploads, saves (identity, answers, bookings: 30 a minute per account) and analytics
+  events are rate-limited, model calls have a daily budget per worker, and at most four password hashes
   run at once.
 - The email lookup key, session key and field encryption keys are separate; the field key accepts
   a list so it can be rotated, and all keys are checked at startup.
 - The app's database role can read and write rows only; it can't change the schema, and it can add
   to the audit log but not change or delete it.
-- Untrusted text (chat, OCR output) is treated as data: delimited and neutralised in the prompt,
-  model output is schema-validated and never executed, no HTML rendering of user or model text.
+- Untrusted text is treated as data: chat text is delimited and neutralised in the prompt (ASCII
+  and full-width angle brackets), OCR output never reaches a model and comes back only as field
+  values to confirm, model output is schema-validated and never executed, and no user or model text
+  is rendered as HTML.
 
 ## Synthetic data
 

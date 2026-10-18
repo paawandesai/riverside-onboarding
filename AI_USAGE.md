@@ -4,8 +4,23 @@
 
 The repository was written with Claude Code, Anthropic's coding agent, working from a written
 brief and guardrails supplied by the author. The exact model and version for each change are
-recorded in that commit's `Co-Authored-By` trailer. Every commit in the history is real; nothing
-was squashed or rewritten.
+recorded in that commit's `Co-Authored-By` trailer; every commit so far carries the same trailer, so
+one model and version wrote all of it. (The project's rule is to name the coding model there rather
+than repeat its identifier in files.) Every commit in the history is real; nothing was squashed or
+rewritten.
+
+What shaped the agent's work, besides the PRD:
+- The author's compliance guardrails: synthetic data only, no secrets in the repo, no PII in logs,
+  no ID images to any model, no forced schema fields, structural prompt-injection controls,
+  license limits, honest measurement, and README disclosure of every rule-versus-PRD conflict.
+- Decisions the author made in the project chat: Python + React on Azure Container Apps, healthcare
+  intake as the domain, own auth instead of Supabase, GitLab instead of GitHub, and a read-only
+  staff login on the public demo.
+- Independent audits run by separate agent sessions (2026-10-17 and a pre-submission audit on
+  2026-10-18), whose findings were fixed in the commits that follow them.
+
+The UI design spec was drafted in a separate Claude design session; its model and version weren't
+recorded.
 
 Claude Code wrote the code, tests, eval harness, Terraform and documentation, ran the test suites,
 evals, load test, license audit and secret scans, and reported the measured numbers in the README
@@ -41,4 +56,5 @@ domain expert has reviewed them.
 | HEIC test sample (`fixtures/generated-heic-sample.heic`) | Decoded by the upload test | Nothing further: it only checks that HEIC decodes |
 | License audit and notices (`scripts/license_audit.py`, `scripts/js_notices.py`, `LICENSES.md`, `frontend/public/third-party-notices.txt`) | Run in CI with `--check` | A check by someone who knows license compliance; package metadata can be wrong |
 | Uptime check and report (`.gitlab-ci.yml` uptime job, `scripts/uptime_report.py`) | Scheduled pipeline runs against the live demo | Confirmation that the schedule's history really covers the period being reported |
+| Fixes from the 2026-10-18 pre-submission audit (OCR through pipes, wider crisis pattern, settings errors without values, low-confidence tags, 503 on database outage, eval thresholds, booking-claim and link filter additions, write limits, daily model-call budget, consent v6) | Backend, unit and end-to-end tests; `make eval` with the Claude path (`eval/scorecards/2026-10-18-claude-haiku-5-5.json`) | An independent security review, and clinical review of the crisis wording list |
 | Fixes from the re-audit and final audit (per-browser sign-out, shared-login protection, upload scan limit and MPO support, id validation, wider phone redaction, booking-claim filter, test-database guard) | Backend, unit and end-to-end tests, and `make eval` filter cases | An independent security review |
