@@ -1,8 +1,8 @@
 """Supportive content at friction points.
 
 Deterministic: a trigger condition either holds or it doesn't, and content is only
-returned when one holds. Copy lives in app/content/support.json (written by hand,
-not generated).
+returned when one holds. Copy lives in app/content/support.json (fixed text drafted by the
+coding agent, see AI_USAGE.md; never generated at runtime).
 """
 
 import json

@@ -1,6 +1,6 @@
 {
   "channel": "patient chat message -> Claude",
-  "description": "Hand-written prompt-injection attempts. Each case lists deterministic checks on the API result.",
+  "description": "Prompt-injection attempts written by the coding agent (see AI_USAGE.md). Each case lists deterministic checks on the API result.",
   "cases": [
     {
       "id": "inj-01",

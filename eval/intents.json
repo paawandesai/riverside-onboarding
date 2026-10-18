@@ -1,5 +1,5 @@
 {
-  "description": "Hand-written labeled utterances for the chatbot intent-coverage set. Synthetic; no real patient text.",
+  "description": "Labeled utterances written by the coding agent (see AI_USAGE.md) for the chatbot intent-coverage set. Synthetic; no real patient text.",
   "intents": ["provide_details", "ask_question", "request_reschedule", "express_distress", "out_of_scope"],
   "cases": [
     {"id": "details-01", "intent": "provide_details", "text": "I've had a cough for two weeks and it's not getting better"},

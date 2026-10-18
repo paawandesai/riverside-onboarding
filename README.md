@@ -155,7 +155,7 @@ in a thread pool.
 | Set | Claude, before prompt change | Claude, after | Rule-based fallback, before | Fallback, after |
 |---|---|---|---|---|
 | `eval/intents.json` (30, used for tuning) | 29/30 | 30/30 | 30/30 | 30/30 |
-| `eval/intents-holdout.json` (40, written 2026-10-17 in patients' own phrasing) | **40/40** | **40/40** | 25/40 | 38/40 |
+| `eval/intents-holdout.json` (40, written by the coding agent on 2026-10-17 in the informal style patients type) | **40/40** | **40/40** | 25/40 | 38/40 |
 
 Re-run on 2026-10-17 after the audit fixes: Claude 30/30 and 40/40, fallback 30/30 and 38/40.
 
@@ -339,8 +339,9 @@ There were no sample ID images to work with, so `scripts/generate_specimen_ids.p
 each in four categories, with `labels.json` ground truth. They are fictional "Maple Grove Community
 Health" member cards with a SPECIMEN watermark, a silhouette face, no real seals and no barcodes.
 No model was asked to produce them. `fixtures/generated-heic-sample.heic` is a small synthetic HEIC
-used by the upload test. `eval/intents.json`, `eval/conversations.json` and the adversarial cases
-are hand-written.
+used by the upload test. `eval/intents.json`, `eval/intents-holdout.json`, `eval/conversations.json`
+and the adversarial cases were written by the coding agent (see `AI_USAGE.md`), not by patients or
+by the author.
 
 ## Repository map
 
