@@ -203,6 +203,26 @@ def test_chat_is_rate_limited_per_account(client, limits_on):
     assert codes[-1] == 429 and set(codes[:20]) == {200}
 
 
+def test_identity_saves_are_rate_limited_per_account(client, limits_on):
+    c = make_client("saver@example.com")
+    body = {"full_name": "Test Person", "dob": "1980-01-02", "address": "1 Main St, Springfield, IL 62701"}
+    codes = [c.put("/api/intake/identity", json=body).status_code for _ in range(ratelimit.WRITES_PER_MINUTE + 1)]
+    assert codes[-1] == 429 and set(codes[:-1]) == {200}
+
+
+def test_daily_model_budget_falls_back_to_rules(monkeypatch):
+    settings = get_settings()
+    monkeypatch.setattr(settings, "anthropic_api_key", type(settings.session_secret)("test-key"))
+    monkeypatch.setattr(settings, "llm_daily_call_cap", 1)
+    calls = []
+    monkeypatch.setattr(llm, "_get_client", lambda: calls.append(1) or (_ for _ in ()).throw(llm.LlmUnavailable("unreachable")))
+    ratelimit.reset()
+    for _ in range(3):
+        assert chat.run_turn([{"role": "user", "content": "knee pain since monday"}]).mode == "fallback"
+    # Only the first turn reached the client; the rest stopped at the budget, even with rate limits off.
+    assert len(calls) == 1
+
+
 def test_keys_are_checked_at_startup(monkeypatch):
     settings = get_settings()
     monkeypatch.setattr(settings, "email_hmac_key", settings.session_secret)
@@ -388,3 +408,46 @@ def test_dotted_dates_with_times_are_not_taken_for_phone_numbers():
 )
 def test_ordinary_replies_using_booking_words_are_kept(reply):
     assert chat.sanitize_reply(reply, "ask_question") == reply
+
+
+def test_settings_error_never_echoes_secret_values(monkeypatch):
+    from app import config
+
+    marker = "FAKEMARK" * 5
+    monkeypatch.setenv("ANTHROPIC_RIVERSIDE_API_KEY", marker)
+    monkeypatch.setenv("SESSION_SECRET", marker.lower())
+    monkeypatch.delenv("DATABASE_URL", raising=False)
+    monkeypatch.setattr(config.Settings, "model_config", {**config.Settings.model_config, "env_file": None})
+    config.get_settings.cache_clear()
+    try:
+        with pytest.raises(config.SettingsError) as info:
+            config.get_settings()
+    finally:
+        config.get_settings.cache_clear()
+    message = str(info.value)
+    assert "DATABASE_URL" in message
+    assert "fakemark" not in message.lower()
+    assert info.value.__cause__ is None and info.value.__suppress_context__
+
+
+def test_database_outage_returns_503_without_claiming_anything_was_saved():
+    from sqlalchemy.exc import OperationalError
+
+    from app.db import get_db
+
+    def down():
+        raise OperationalError("SELECT 1", {}, ConnectionRefusedError("refused"))
+        yield  # pragma: no cover - makes this a generator dependency like get_db
+
+    app.dependency_overrides[get_db] = down
+    try:
+        client = TestClient(app, raise_server_exceptions=False)
+        r = client.post("/api/auth/login", json={"email": "a@example.com", "password": "whatever-123"}, headers=API_HEADERS)
+    finally:
+        app.dependency_overrides.pop(get_db, None)
+    assert r.status_code == 503
+    assert "nothing new was saved" in r.json()["detail"]
+
+
+def test_health_answers_head_for_uptime_monitors(client):
+    assert client.head("/api/health").status_code == 200

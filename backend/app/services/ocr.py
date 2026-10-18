@@ -1,4 +1,4 @@
-"""Document text extraction with Tesseract (run as a separate process via pytesseract).
+"""Document text extraction with Tesseract (run as a separate process).
 
 The pipeline is deliberately simple and deterministic:
   1. preprocess (grayscale, upscale, deskew by projection profile, contrast)
@@ -11,8 +11,10 @@ Each field reports found / missing / low_confidence. Nothing is guessed: a field
 cannot read is returned as None so the user fills it in.
 """
 
+import io
 import os
 import re
+import subprocess
 import time
 from dataclasses import dataclass, field
 from datetime import date
@@ -143,22 +145,36 @@ class _Line:
         return _Line([w for w in self.words if w.left >= x]) if any(w.left >= x for w in self.words) else self
 
 
-def _ocr_lines(image: Image.Image, psm: int = 4) -> list[_Line]:
-    settings = get_settings()
-    pytesseract.pytesseract.tesseract_cmd = settings.tesseract_cmd
-    try:
-        data = pytesseract.image_to_data(image, lang="eng", config=f"--oem 1 --psm {psm}", output_type=pytesseract.Output.DICT, timeout=15)
-    except (pytesseract.TesseractNotFoundError, RuntimeError) as exc:
-        raise OcrUnavailable(type(exc).__name__) from exc
+def _tesseract_tsv(image: Image.Image, psm: int) -> list[list[str]]:
+    """Run Tesseract on the image entirely through pipes: PNG bytes in on stdin, TSV out on stdout.
 
+    pytesseract writes the image and its OCR output to temp files; this keeps both in memory.
+    """
+    buf = io.BytesIO()
+    image.save(buf, format="PNG")
+    cmd = [get_settings().tesseract_cmd, "stdin", "stdout", "--oem", "1", "--psm", str(psm), "-l", "eng", "tsv"]
+    try:
+        proc = subprocess.run(cmd, input=buf.getvalue(), capture_output=True, timeout=15, check=False)  # noqa: S603 - fixed argv, no shell
+    except FileNotFoundError as exc:
+        raise OcrUnavailable("TesseractNotFoundError") from exc
+    except subprocess.TimeoutExpired as exc:
+        raise OcrUnavailable("TimeoutExpired") from exc
+    if proc.returncode != 0:
+        raise OcrUnavailable(f"tesseract_exit_{proc.returncode}")
+    rows = [line.split("\t") for line in proc.stdout.decode("utf-8", "replace").splitlines()[1:]]
+    return [r for r in rows if len(r) == 12]
+
+
+def _ocr_lines(image: Image.Image, psm: int = 4) -> list[_Line]:
     grouped: dict[tuple[int, int, int], list[_Word]] = {}
-    for i, word in enumerate(data["text"]):
-        word = word.strip()
-        conf = float(data["conf"][i])
+    # TSV columns: level page block par line word left top width height conf text
+    for row in _tesseract_tsv(image, psm):
+        word = row[11].strip()
+        conf = float(row[10])
         if not word or conf < 0:
             continue
-        key = (data["block_num"][i], data["par_num"][i], data["line_num"][i])
-        grouped.setdefault(key, []).append(_Word(word, conf, int(data["left"][i])))
+        key = (int(row[2]), int(row[3]), int(row[4]))
+        grouped.setdefault(key, []).append(_Word(word, conf, int(row[6])))
     return [_Line(sorted(grouped[key], key=lambda w: w.left)) for key in sorted(grouped)]
 
 

@@ -11,6 +11,7 @@ from sqlalchemy.orm import Session
 from app.db import get_db
 from app.logging_config import log_event
 from app.models import UUID_PATTERN, Booking, Slot, User
+from app.ratelimit import WRITES_PER_MINUTE, check
 from app.routers.intake import require_consent
 from app.security import current_user
 from app.services import scheduling
@@ -58,6 +59,8 @@ class ConflictOut(BaseModel):
 
 @router.post("/bookings", response_model=BookingOut, status_code=201, responses={409: {"model": ConflictOut}})
 def create_booking(body: BookIn, user: User = Depends(require_consent), db: Session = Depends(get_db)) -> BookingOut | JSONResponse:
+    # Each rebooking adds a cancelled row and an audit row, so one account can't do it in a loop.
+    check("write", user.id, WRITES_PER_MINUTE, 60)
     started = time.perf_counter()
     try:
         booking = scheduling.book(db, user.id, body.slot_id)
@@ -96,5 +99,6 @@ def my_bookings(user: User = Depends(current_user), db: Session = Depends(get_db
 def cancel_booking(
     booking_id: str = Path(pattern=UUID_PATTERN), user: User = Depends(require_consent), db: Session = Depends(get_db)
 ) -> None:
+    check("write", user.id, WRITES_PER_MINUTE, 60)
     if not scheduling.cancel(db, user.id, booking_id):
         raise HTTPException(status_code=404, detail="Booking not found.")

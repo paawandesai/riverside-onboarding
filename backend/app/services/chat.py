@@ -25,9 +25,14 @@ AI_DISCLOSURE = "You're chatting with an AI assistant. A member of our care team
 # Crisis language in common forms, including indirect ones ("better off without me", "no point").
 # Erring towards a false alarm is deliberate: a match only adds crisis resources to the reply.
 _DISTRESS = re.compile(
-    r"\b(suicid\w*|kill (?:my|him|her)self|end (?:it all|my life)|self[- ]?harm|hurt(?:ing)? myself|"
-    r"(?:want|wanna|wish(?: i)?) (?:to )?(?:die|be dead|was dead|were dead)|better off (?:dead|without me)|"
-    r"don'?t want to (?:live|be here|wake up)|(?:no|don'?t see the|what'?s the) point (?:of|in|to)? ?(?:living|going on|any of this|anything)|"
+    r"\b(suicid\w*|k[i1!]ll (?:my|him|her)self|un-?alive|end (?:it all|it (?:tonight|today|now)|things|everything|my life)|"
+    r"self[- ]?harm|hurt(?:ing)? myself|cut(?:ting)? myself|overdos\w*|od on|"
+    r"took (?:all|too many|a (?:bunch|handful|whole bottle) of|the whole bottle of) (?:my |of my |the )?(?:pills|meds|tablets|medications?|sleeping pills)|"
+    r"jump (?:off|from) (?:a|the) (?:bridge|building|roof)|no reason to (?:live|go on)|nothing (?:left )?to live for|"
+    r"(?:want|wanna|wish(?: i)?) (?:to )?(?:die|be dead|was dead|were dead|disappear forever)|better off (?:dead|without me)|"
+    r"(?:don'?t|do not|no longer) want to (?:live|be here|wake up|be alive|exist|go on)|"
+    # Spanish, German and French basics: a match only adds crisis resources.
+    r"quiero morir(?:me)?|suicidarme|matarme|ich will (?:nicht mehr leben|sterben)|mich umbringen|je veux mourir|me tuer|(?:no|don'?t see the|what'?s the) point (?:of|in|to)? ?(?:living|going on|any of this|anything)|"
     r"hopeless|can'?t go on|can'?t cope|can'?t take (?:it|this|much more)(?: anymore)?|(?:it'?s|everything is) too much|"
     r"can'?t stop (?:crying|shaking)|crying all day|panic attacks?|overwhelmed|terrified|(?:really|so|very) (?:scared|frightened)|"
     r"in crisis|no one to talk to|don'?t know who to talk to)\b",
@@ -64,7 +69,9 @@ _DOT = r"(?:\.|\[\.\]|\(\.\)|\{\.\}|[\u3002\uff0e\uff61])"
 _URL = re.compile(
     r"(\b(?:h[tx]{2}ps?|ftp)://\S+|\bwww" + _DOT + r"\S+|!\[[^\]]*\]\([^)]*\)|\[[^\]]*\]\([^)]*\)|"
     r"\b\d{1,3}(?:" + _DOT + r"\d{1,3}){3}(?::\d+)?(?:/\S*)?|"
-    r"\b(?:[a-z0-9-]+" + _DOT + r")+(?-i:[a-z]{2,24}|[A-Z]{2,24})\b(?:/\S*)?)",
+    r"\b(?:[a-z0-9-]+" + _DOT + r")+(?-i:[a-z]{2,24}|[A-Z]{2,24})\b(?:/\S*)?|"
+    # Any-case domain followed by a path ("Evil.Com/login"): the path makes it a link, not a name.
+    r"\b(?:[a-z0-9-]+" + _DOT + r")+[a-z]{2,24}/\S*)",
     re.I,
 )
 # Any wording that claims an appointment was made, changed or cancelled. Only the scheduling API can do
@@ -89,7 +96,13 @@ _COMMITMENT = re.compile(
     r"\b(?:it|that)(?:'s| is| has been| was)\s+(?:all\s+|now\s+)*" + _DONE + r"\b|"
     r"(?:day|am|pm|\d)\s*[:\u2013-]\s*(?:now\s+)?" + _DONE + r"\b|"
     r"\byou(?:'re| are)\s+(?:all\s+)?good to go (?:for|on|at)\b|\bit(?:'s| is) (?:all )?yours\b|"
-    r"\bsee you (?:on |at |next |tomorrow|monday|tuesday|wednesday|thursday|friday|saturday|sunday)",
+    r"\bsee you (?:on |at |next |then\b|tomorrow|monday|tuesday|wednesday|thursday|friday|saturday|sunday)|"
+    # Completion words other than the ones above: "Booking complete", "Your slot has been secured",
+    # "I have taken care of the appointment", "Appointment: locked for Tue".
+    r"\b(?:appointment|appt|visit|booking|slot|reservation)s?\b[^.!?\n]{0,30}?\b(?:complete[d]?|secured|locked|taken care of|"
+    r"all set|sorted|finali[sz]ed)\b|"
+    r"\b(?:secured|locked(?: in)?|taken care of|sorted(?: out)?|finali[sz]ed)\s+(?:the|your|an?|that)\s+"
+    r"(?:appointment|appt|visit|booking|slot|reservation)\b",
     re.I,
 )
 

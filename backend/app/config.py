@@ -1,6 +1,6 @@
 from functools import lru_cache
 
-from pydantic import AliasChoices, Field, SecretStr
+from pydantic import AliasChoices, Field, SecretStr, ValidationError
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -41,6 +41,8 @@ class Settings(BaseSettings):
     anthropic_model: str = "claude-haiku-5-5"
     anthropic_effort: str = "low"
     anthropic_timeout_seconds: float = 6.0
+    # Spend guard: model calls per worker per 24 h; past it, chat runs on the rule-based fallback. 0 turns it off.
+    llm_daily_call_cap: int = 2000
 
     static_dir: str = "static"
     tesseract_cmd: str = "tesseract"
@@ -67,6 +69,17 @@ class Settings(BaseSettings):
         return self.app_env != "development" and self.app_env != "test"
 
 
+class SettingsError(RuntimeError):
+    """Configuration is missing or invalid. The message names settings only, never their values."""
+
+
 @lru_cache
 def get_settings() -> Settings:
-    return Settings()
+    try:
+        return Settings()
+    except ValidationError as exc:
+        # pydantic's own message echoes the input values, which include secrets; keep names and reasons only.
+        problems = "; ".join(
+            f"{'.'.join(str(p) for p in err['loc']).upper() or 'SETTINGS'}: {err['msg']}" for err in exc.errors(include_input=False)
+        )
+        raise SettingsError(f"Invalid configuration: {problems}") from None

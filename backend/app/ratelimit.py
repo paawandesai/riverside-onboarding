@@ -41,6 +41,9 @@ class SlidingWindow:
 
 _window = SlidingWindow()
 
+# Saves of identity, answers and bookings per account per minute: far above what a person does.
+WRITES_PER_MINUTE = 30
+
 
 def reset() -> None:
     _window.reset()
@@ -54,6 +57,11 @@ def client_ip(request: Request) -> str:
         if len(forwarded) >= hops:
             return forwarded[-hops]
     return request.client.host if request.client else "unknown"
+
+
+def within_budget(name: str, limit: int, window_seconds: float) -> bool:
+    """A worker-wide budget that applies even when per-caller rate limits are switched off."""
+    return limit <= 0 or _window.allow(f"budget:{name}", limit, window_seconds)
 
 
 def check(name: str, key: str, limit: int, window_seconds: float) -> None:

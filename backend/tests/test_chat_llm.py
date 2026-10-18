@@ -191,6 +191,14 @@ def test_assessment_summary_is_marked_non_binding(user_client):
         "everything is too much right now, I can't cope",
         "I've been crying all day and I don't know who to talk to",
         "I wish I was dead",
+        # Phrasings the 2026-10-18 audit found the fallback missing.
+        "I took all my pills",
+        "I am going to end things tonight",
+        "I don't want to be alive anymore",
+        "i just want to unalive myself",
+        "k1ll myself",
+        "quiero morir",
+        "Ich will sterben",
     ],
 )
 def test_indirect_crisis_language_gets_the_safety_reply_without_the_model(text):
@@ -199,7 +207,15 @@ def test_indirect_crisis_language_gets_the_safety_reply_without_the_model(text):
 
 
 @pytest.mark.parametrize(
-    "text", ["I'm scared of needles, can someone be gentle", "no point in waiting, book me in", "my knee hurts too much to walk"]
+    "text",
+    [
+        "I'm scared of needles, can someone be gentle",
+        "no point in waiting, book me in",
+        "my knee hurts too much to walk",
+        "I took my pills this morning",
+        "Can I end the visit early?",
+        "I need a refill of my pills",
+    ],
 )
 def test_ordinary_worry_is_not_treated_as_a_crisis(text):
     assert chat.rule_based_turn(text).intent != "express_distress"

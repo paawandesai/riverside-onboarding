@@ -183,3 +183,36 @@ def test_rejects_jpeg_with_too_many_scans():
     crafted = head + (sep + tail[:-2]) * 80 + b"\xff\xd9"
     with pytest.raises(UploadRejected, match="standard JPEG"):
         validate_and_clean(crafted, 10_000_000)
+
+
+def test_ocr_writes_no_temp_files(tmp_path, monkeypatch):
+    # The consent notice promises the photo is never written to disk: OCR runs through pipes only.
+    import tempfile
+
+    spool = tmp_path / "tmp"
+    spool.mkdir()
+    monkeypatch.setattr(tempfile, "tempdir", str(spool))
+    monkeypatch.setenv("TMPDIR", str(spool))
+    with Image.open(os.path.join(GOLDEN, "specimen-01.jpg")) as img:
+        result = ocr.extract_fields(img)
+    assert result.fields["full_name"].value
+    assert list(spool.iterdir()) == []
+
+
+def test_ocr_missing_engine_and_timeout_raise_unavailable(monkeypatch):
+    import subprocess
+
+    def missing(*a, **k):
+        raise FileNotFoundError("tesseract")
+
+    def slow(*a, **k):
+        raise subprocess.TimeoutExpired("tesseract", 15)
+
+    img = Image.new("RGB", (100, 60), "white")
+    for fake in (missing, slow):
+        monkeypatch.setattr(ocr.subprocess, "run", fake)
+        with pytest.raises(ocr.OcrUnavailable):
+            ocr.extract_fields(img)
+    monkeypatch.setattr(ocr.subprocess, "run", lambda *a, **k: subprocess.CompletedProcess(a, 1, b"", b"err"))
+    with pytest.raises(ocr.OcrUnavailable):
+        ocr.extract_fields(img)

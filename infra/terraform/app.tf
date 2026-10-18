@@ -69,6 +69,7 @@ locals {
     ANTHROPIC_MODEL           = var.anthropic_model
     ANTHROPIC_EFFORT          = "low"
     ANTHROPIC_TIMEOUT_SECONDS = "6"
+    LLM_DAILY_CALL_CAP        = "2000"
   }
 }
 

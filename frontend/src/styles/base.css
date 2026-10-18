@@ -281,3 +281,6 @@ fieldset {
 .tag--missing {
   color: var(--danger);
 }
+.tag--unsure {
+  color: var(--danger);
+}
