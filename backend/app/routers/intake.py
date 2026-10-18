@@ -16,7 +16,7 @@ from app.config import get_settings
 from app.db import get_db
 from app.logging_config import log_event
 from app.models import Booking, IntakeRecord, User
-from app.ratelimit import check
+from app.ratelimit import WRITES_PER_MINUTE, check
 from app.security import current_user, decrypt_json, decrypt_str, encrypt_json, encrypt_str
 from app.services import health_state, ocr
 from app.services.chat import assessment_summary
@@ -221,6 +221,7 @@ def _out(record: IntakeRecord) -> IntakeOut:
 
 @router.put("/intake/identity", response_model=IntakeOut)
 def save_identity(body: IdentityIn, user: User = Depends(require_consent), db: Session = Depends(get_db)) -> IntakeOut:
+    check("write", user.id, WRITES_PER_MINUTE, 60)
     record = _record(db, user.id)
     record.full_name_enc = encrypt_str(body.full_name)
     record.dob_enc = encrypt_str(body.dob.isoformat())
@@ -233,6 +234,7 @@ def save_identity(body: IdentityIn, user: User = Depends(require_consent), db: S
 
 @router.put("/intake/assessment", response_model=IntakeOut)
 def save_assessment(body: AssessmentIn, user: User = Depends(require_consent), db: Session = Depends(get_db)) -> IntakeOut:
+    check("write", user.id, WRITES_PER_MINUTE, 60)
     record = _record(db, user.id)
     record.assessment_enc = encrypt_json(body.model_dump())
     record.assessment_confirmed_at = datetime.now(UTC)

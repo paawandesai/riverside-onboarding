@@ -13,6 +13,7 @@ from dataclasses import dataclass
 
 import anthropic
 
+from app import ratelimit
 from app.config import get_settings
 from app.logging_config import log_event
 from app.services import health_state
@@ -156,6 +157,9 @@ def classify_turn(history: list[dict]) -> LlmTurn:
     settings = get_settings()
     if not settings.llm_enabled:
         raise LlmUnavailable("disabled")
+    if not ratelimit.within_budget("llm_calls", settings.llm_daily_call_cap, 86400):
+        log_event(logger, "llm_daily_cap_reached", logging.WARNING, component="llm")
+        raise LlmUnavailable("daily_cap")
     started = time.perf_counter()
     try:
         response = _get_client().messages.create(

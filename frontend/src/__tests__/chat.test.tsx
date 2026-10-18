@@ -22,7 +22,7 @@ test("chat opens with a labelled AI greeting and renders replies as plain text",
   });
   const { container } = renderApp("/chat");
   const log = await screen.findByRole("log");
-  expect(within(log).getByText(/I'm an AI assistant/)).toBeInTheDocument();
+  expect(within(log).getByText(/My replies are written by AI/)).toBeInTheDocument();
   expect(within(log).getAllByText("AI").length).toBe(1);
   expect(await axeViolations(container)).toEqual([]);
 

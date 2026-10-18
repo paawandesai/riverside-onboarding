@@ -41,6 +41,8 @@ class Settings(BaseSettings):
     anthropic_model: str = "claude-haiku-5-5"
     anthropic_effort: str = "low"
     anthropic_timeout_seconds: float = 6.0
+    # Spend guard: model calls per worker per 24 h; past it, chat runs on the rule-based fallback. 0 turns it off.
+    llm_daily_call_cap: int = 2000
 
     static_dir: str = "static"
     tesseract_cmd: str = "tesseract"

@@ -95,7 +95,7 @@ test("deleting the account asks first, then clears everything", async () => {
 test("the shared demo login can delete its data but not the account itself", async () => {
   mockFetch({
     "GET /api/auth/me": { body: { ...ME, shared_login: true } },
-    "GET /api/consent": { body: { active: true, version: "2026-10-v5", photo_scan: false } },
+    "GET /api/consent": { body: { active: true, version: "2026-10-v6", photo_scan: false } },
   });
   renderApp("/privacy");
   expect(await screen.findByText(/shared demo login other reviewers use/)).toBeInTheDocument();

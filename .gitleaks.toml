@@ -5,3 +5,6 @@ useDefault = true
 [allowlist]
 description = "The change-me placeholders in .env.example are not secrets; any other value there is still scanned"
 regexes = ['''change-me''']
+# Only in .env.example: a change-me value anywhere else is still reported.
+paths = ['''^\.env\.example$''']
+condition = "AND"

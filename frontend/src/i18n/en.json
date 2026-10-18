@@ -59,7 +59,7 @@
   "chat.assistant": "Intake assistant",
   "chat.aiLabel": "AI",
   "chat.you": "You",
-  "chat.greeting": "Hi, I'm an AI assistant helping you get ready for your visit. What's the main reason you'd like to see someone?",
+  "chat.greeting": "Hi, I'm an automated assistant helping you get ready for your visit. My replies are written by AI, or by simple fixed rules when the AI is unavailable. What's the main reason you'd like to see someone?",
   "chat.message": "Message",
   "chat.send": "Send",
   "chat.thinking": "The assistant is replying…",

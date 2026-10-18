@@ -9,6 +9,8 @@ from app.services import health_state, ocr
 router = APIRouter(prefix="/api", tags=["system"])
 
 
+# HEAD answers too, for uptime monitors that probe with it (kept out of the API schema).
+@router.head("/health", include_in_schema=False)
 @router.get("/health")
 def health(db: Session = Depends(get_db)) -> dict:
     """Configuration and last-success timestamps. Never calls the model or decrypts secrets."""
