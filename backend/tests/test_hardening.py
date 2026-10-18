@@ -388,3 +388,23 @@ def test_dotted_dates_with_times_are_not_taken_for_phone_numbers():
 )
 def test_ordinary_replies_using_booking_words_are_kept(reply):
     assert chat.sanitize_reply(reply, "ask_question") == reply
+
+
+def test_settings_error_never_echoes_secret_values(monkeypatch):
+    from app import config
+
+    marker = "FAKEMARK" * 5
+    monkeypatch.setenv("ANTHROPIC_RIVERSIDE_API_KEY", marker)
+    monkeypatch.setenv("SESSION_SECRET", marker.lower())
+    monkeypatch.delenv("DATABASE_URL", raising=False)
+    monkeypatch.setattr(config.Settings, "model_config", {**config.Settings.model_config, "env_file": None})
+    config.get_settings.cache_clear()
+    try:
+        with pytest.raises(config.SettingsError) as info:
+            config.get_settings()
+    finally:
+        config.get_settings.cache_clear()
+    message = str(info.value)
+    assert "DATABASE_URL" in message
+    assert "fakemark" not in message.lower()
+    assert info.value.__cause__ is None and info.value.__suppress_context__
