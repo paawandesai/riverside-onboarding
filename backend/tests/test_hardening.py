@@ -408,3 +408,22 @@ def test_settings_error_never_echoes_secret_values(monkeypatch):
     assert "DATABASE_URL" in message
     assert "fakemark" not in message.lower()
     assert info.value.__cause__ is None and info.value.__suppress_context__
+
+
+def test_database_outage_returns_503_without_claiming_anything_was_saved():
+    from sqlalchemy.exc import OperationalError
+
+    from app.db import get_db
+
+    def down():
+        raise OperationalError("SELECT 1", {}, ConnectionRefusedError("refused"))
+        yield  # pragma: no cover - makes this a generator dependency like get_db
+
+    app.dependency_overrides[get_db] = down
+    try:
+        client = TestClient(app, raise_server_exceptions=False)
+        r = client.post("/api/auth/login", json={"email": "a@example.com", "password": "whatever-123"}, headers=API_HEADERS)
+    finally:
+        app.dependency_overrides.pop(get_db, None)
+    assert r.status_code == 503
+    assert "nothing new was saved" in r.json()["detail"]

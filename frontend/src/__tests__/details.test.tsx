@@ -63,6 +63,9 @@ test("photo is reviewed, read, and every field is shown for checking with where 
   expect(screen.getByLabelText("ZIP")).toHaveFocus();
   expect(screen.getAllByText("From your photo, please check").length).toBeGreaterThan(2);
   expect(screen.getAllByText(/We couldn't read this/).length).toBe(1);
+  // The date of birth came back low-confidence, so it alone is flagged for a careful check.
+  expect(screen.getAllByText(/we weren't sure/).length).toBe(1);
+  expect(screen.getByText(/we weren't sure/).closest(".field, fieldset")).toContainElement(screen.getByLabelText("Month"));
   expect(calls.find((c) => c.url === "/api/support/evaluate")!.body).toEqual({ ocr_low_confidence: true });
   expect(await axeViolations(container)).toEqual([]);
 

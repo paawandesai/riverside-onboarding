@@ -1,8 +1,8 @@
-import { AlertCircle, ScanLine } from "lucide-react";
+import { AlertCircle, AlertTriangle, ScanLine } from "lucide-react";
 import { forwardRef, type InputHTMLAttributes, type ReactNode } from "react";
 import { t } from "../i18n";
 
-export type Provenance = "ocr" | "missing" | null;
+export type Provenance = "ocr" | "unsure" | "missing" | null;
 
 export function ProvenanceTag({ kind }: { kind: Provenance }) {
   if (kind === "ocr")
@@ -10,6 +10,13 @@ export function ProvenanceTag({ kind }: { kind: Provenance }) {
       <span className="tag">
         <ScanLine aria-hidden="true" size={16} />
         {t("confirm.fromPhoto")}
+      </span>
+    );
+  if (kind === "unsure")
+    return (
+      <span className="tag tag--unsure">
+        <AlertTriangle aria-hidden="true" size={16} />
+        {t("confirm.unsure")}
       </span>
     );
   if (kind === "missing")
@@ -64,7 +71,7 @@ export const TextField = forwardRef<HTMLInputElement, TextFieldProps>(function T
       <input
         ref={ref}
         id={id}
-        className={`input ${provenance === "ocr" ? "input--ocr" : ""} ${className ?? ""}`}
+        className={`input ${provenance === "ocr" || provenance === "unsure" ? "input--ocr" : ""} ${className ?? ""}`}
         aria-invalid={error ? true : undefined}
         aria-describedby={describedBy}
         {...rest}

@@ -136,8 +136,8 @@ def redact(text: str) -> str:
 
 
 def _wrap(text: str) -> str:
-    # Neutralize any attempt to close the data tag early.
-    safe = redact(text).replace("<", "‹").replace(">", "›")
+    # Neutralize any attempt to close the data tag early, including full-width look-alike brackets.
+    safe = redact(text).replace("<", "‹").replace(">", "›").replace("\uff1c", "‹").replace("\uff1e", "›")
     return f"<patient_message>\n{safe}\n</patient_message>"
 
 

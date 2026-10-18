@@ -60,8 +60,12 @@ export function ConfirmDetails() {
     formState: { errors, dirtyFields },
   } = useForm<Values>({ resolver: zodResolver(schema), defaultValues: initial, shouldFocusError: true });
 
-  // From the photo, untouched: tag it. Missing from the photo: say so. Typed by hand: no tag.
-  const provenance = (filled: boolean, dirty: boolean): Provenance => (!extracted || dirty ? null : filled ? "ocr" : "missing");
+  // From the photo, untouched: tag it, and say so when OCR was unsure. Missing from the photo: say so. Typed by hand: no tag.
+  const provenance = (field: FieldName, filled: boolean, dirty: boolean): Provenance => {
+    if (!extracted || dirty) return null;
+    if (!filled) return "missing";
+    return extracted.fields[field]?.status === "low_confidence" ? "unsure" : "ocr";
+  };
   const dobDirty = Boolean(dirtyFields.month || dirtyFields.day || dirtyFields.year);
 
   useEffect(() => {
@@ -120,20 +124,20 @@ export function ConfirmDetails() {
           id="full_name"
           label={t("confirm.name")}
           autoComplete="name"
-          provenance={provenance(Boolean(initial.full_name), Boolean(dirtyFields.full_name))}
+          provenance={provenance("full_name", Boolean(initial.full_name), Boolean(dirtyFields.full_name))}
           error={errors.full_name?.message}
           {...register("full_name")}
         />
         <DateOfBirthInput
           register={register as never}
           error={errors.month?.message}
-          provenance={provenance(Boolean(initial.year), dobDirty)}
+          provenance={provenance("dob", Boolean(initial.year), dobDirty)}
         />
         <TextField
           id="street"
           label={t("confirm.street")}
           autoComplete="address-line1"
-          provenance={provenance(Boolean(initial.street), Boolean(dirtyFields.street))}
+          provenance={provenance("address", Boolean(initial.street), Boolean(dirtyFields.street))}
           error={errors.street?.message}
           {...register("street")}
         />
@@ -142,7 +146,7 @@ export function ConfirmDetails() {
             id="city"
             label={t("confirm.city")}
             autoComplete="address-level2"
-            provenance={provenance(Boolean(initial.city), Boolean(dirtyFields.city))}
+            provenance={provenance("address", Boolean(initial.city), Boolean(dirtyFields.city))}
             error={errors.city?.message}
             {...register("city")}
           />
@@ -151,7 +155,7 @@ export function ConfirmDetails() {
             label={t("confirm.state")}
             autoComplete="address-level1"
             maxLength={2}
-            provenance={provenance(Boolean(initial.state), Boolean(dirtyFields.state))}
+            provenance={provenance("address", Boolean(initial.state), Boolean(dirtyFields.state))}
             error={errors.state?.message}
             {...register("state")}
           />
@@ -161,7 +165,7 @@ export function ConfirmDetails() {
             autoComplete="postal-code"
             inputMode="numeric"
             maxLength={5}
-            provenance={provenance(Boolean(initial.zip), Boolean(dirtyFields.zip))}
+            provenance={provenance("address", Boolean(initial.zip), Boolean(dirtyFields.zip))}
             error={errors.zip?.message}
             {...register("zip")}
           />

@@ -69,7 +69,9 @@ _DOT = r"(?:\.|\[\.\]|\(\.\)|\{\.\}|[\u3002\uff0e\uff61])"
 _URL = re.compile(
     r"(\b(?:h[tx]{2}ps?|ftp)://\S+|\bwww" + _DOT + r"\S+|!\[[^\]]*\]\([^)]*\)|\[[^\]]*\]\([^)]*\)|"
     r"\b\d{1,3}(?:" + _DOT + r"\d{1,3}){3}(?::\d+)?(?:/\S*)?|"
-    r"\b(?:[a-z0-9-]+" + _DOT + r")+(?-i:[a-z]{2,24}|[A-Z]{2,24})\b(?:/\S*)?)",
+    r"\b(?:[a-z0-9-]+" + _DOT + r")+(?-i:[a-z]{2,24}|[A-Z]{2,24})\b(?:/\S*)?|"
+    # Any-case domain followed by a path ("Evil.Com/login"): the path makes it a link, not a name.
+    r"\b(?:[a-z0-9-]+" + _DOT + r")+[a-z]{2,24}/\S*)",
     re.I,
 )
 # Any wording that claims an appointment was made, changed or cancelled. Only the scheduling API can do
@@ -94,7 +96,13 @@ _COMMITMENT = re.compile(
     r"\b(?:it|that)(?:'s| is| has been| was)\s+(?:all\s+|now\s+)*" + _DONE + r"\b|"
     r"(?:day|am|pm|\d)\s*[:\u2013-]\s*(?:now\s+)?" + _DONE + r"\b|"
     r"\byou(?:'re| are)\s+(?:all\s+)?good to go (?:for|on|at)\b|\bit(?:'s| is) (?:all )?yours\b|"
-    r"\bsee you (?:on |at |next |tomorrow|monday|tuesday|wednesday|thursday|friday|saturday|sunday)",
+    r"\bsee you (?:on |at |next |then\b|tomorrow|monday|tuesday|wednesday|thursday|friday|saturday|sunday)|"
+    # Completion words other than the ones above: "Booking complete", "Your slot has been secured",
+    # "I have taken care of the appointment", "Appointment: locked for Tue".
+    r"\b(?:appointment|appt|visit|booking|slot|reservation)s?\b[^.!?\n]{0,30}?\b(?:complete[d]?|secured|locked|taken care of|"
+    r"all set|sorted|finali[sz]ed)\b|"
+    r"\b(?:secured|locked(?: in)?|taken care of|sorted(?: out)?|finali[sz]ed)\s+(?:the|your|an?|that)\s+"
+    r"(?:appointment|appt|visit|booking|slot|reservation)\b",
     re.I,
 )
 

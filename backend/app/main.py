@@ -10,6 +10,7 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, HTMLResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
+from sqlalchemy.exc import InterfaceError, OperationalError
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from app.bodylimit import TOO_LARGE, BodyLimitMiddleware, BodyTooLarge
@@ -102,6 +103,13 @@ def create_app() -> FastAPI:
             response = await call_next(request)
         except BodyTooLarge:
             response = JSONResponse(status_code=413, content={"detail": TOO_LARGE})
+        except (OperationalError, InterfaceError) as exc:
+            # The database is unreachable: nothing in this request was saved, so say that, not "saved".
+            log_event(logger, "database_unavailable", logging.ERROR, request_id=request_id, error_type=type(exc).__name__)
+            response = JSONResponse(
+                status_code=503,
+                content={"detail": "We can't reach our records right now, so nothing new was saved. Please try again in a minute."},
+            )
         except Exception as exc:  # noqa: BLE001 - last-resort guard, details never echoed
             log_event(logger, "unhandled_error", logging.ERROR, request_id=request_id, error_type=type(exc).__name__)
             response = JSONResponse(

@@ -8,7 +8,7 @@ type Props = { register: UseFormRegister<DobFields & Record<string, string>>; er
 
 /** Month / Day / Year as three numeric text inputs (US order). No dropdowns, no date picker. */
 export function DateOfBirthInput({ register, error, provenance }: Props) {
-  const ocr = provenance === "ocr" ? "input--ocr" : "";
+  const ocr = provenance === "ocr" || provenance === "unsure" ? "input--ocr" : "";
   const describedBy = ["dob-hint", provenance ? "dob-prov" : "", error ? "dob-error" : ""].filter(Boolean).join(" ");
   return (
     <fieldset className="field" aria-describedby={describedBy} id="dob">
