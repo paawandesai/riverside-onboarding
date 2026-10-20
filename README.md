@@ -230,8 +230,8 @@ requests `/api/health` on the live demo and fails unless it answers HTTP 200 wit
 `"status":"ok"` (database reachable, OCR engine present). The health
 endpoint makes no model call, and the app already keeps one instance running, so the check measures
 availability without changing it. `python scripts/uptime_report.py --since <date>` counts the results,
-and how many checks the schedule should have run, so missed runs show up as unknown rather than
-disappearing (it needs a GitLab token with `read_api` in `GITLAB_TOKEN`).
+and how many checks the schedule should have run, so missed runs and runner faults (a lost runner or
+timeout, which never reached the app) show up as unknown rather than as downtime or disappearing (it needs a GitLab token with `read_api` in `GITLAB_TOKEN`).
 
 The schedule started on 2026-10-17, so there is no meaningful uptime figure yet; run the report
 above for the current number rather than trusting one written here.
