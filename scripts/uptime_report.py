@@ -2,7 +2,8 @@
 
 Each scheduled pipeline (UPTIME_CHECK=1) runs one check of /api/health. This counts how many passed,
 and compares the number of checks that ran with the number the 15-minute schedule should have run,
-so missed runs (runner down, schedule paused) show up as unknown instead of disappearing.
+so missed runs (runner down, schedule paused) show up as unknown instead of disappearing. A job that
+failed for a runner reason (lost runner, timeout) never reached the app, so it counts as unknown, not down.
 
     GITLAB_HOST=... GITLAB_REPO_PATH=... GITLAB_TOKEN=... python scripts/uptime_report.py [--since 2026-10-17]
 
@@ -43,8 +44,11 @@ def main() -> None:
             for job in get(f"/pipelines/{p['id']}/jobs", {"per_page": 100}):
                 if job["name"] != "uptime":
                     continue
-                counts[job["status"]] = counts.get(job["status"], 0) + 1
-                if job["status"] in ("success", "failed"):
+                status = job["status"]
+                if status == "failed" and job.get("failure_reason") not in (None, "script_failure"):
+                    status = f"runner fault ({job['failure_reason']})"
+                counts[status] = counts.get(status, 0) + 1
+                if status in ("success", "failed"):
                     first = min(first or job["created_at"], job["created_at"])
                     last = max(last or job["created_at"], job["created_at"])
         page += 1
@@ -56,7 +60,7 @@ def main() -> None:
     start = datetime.fromisoformat(args.since).replace(tzinfo=UTC) if args.since else datetime.fromisoformat(first)
     expected = int((datetime.now(UTC) - start).total_seconds() // (args.every_minutes * 60))
     other = {k: v for k, v in counts.items() if k not in ("success", "failed") and v}
-    print(f"expected about {expected} scheduled checks since {start:%Y-%m-%d %H:%M} UTC; {max(expected - total, 0)} unknown (missed, canceled or still running)")
+    print(f"expected about {expected} scheduled checks since {start:%Y-%m-%d %H:%M} UTC; {max(expected - total, 0)} unknown (missed, canceled, runner fault or still running)")
     if other:
         print(f"not completed: {other}")
 

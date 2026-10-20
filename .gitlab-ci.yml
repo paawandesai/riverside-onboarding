@@ -21,6 +21,8 @@ uptime:
   stage: scan
   image: curlimages/curl:8.11.1
   interruptible: false
+  variables:
+    GIT_STRATEGY: none  # the check needs no source; skipping the clone keeps runner/git faults out of the result
   rules:
     - if: '$UPTIME_CHECK == "1"'
   # /api/health makes no model call. The app runs with min_replicas=1, so this check measures
